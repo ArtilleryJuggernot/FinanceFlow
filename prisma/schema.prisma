@@ -1,0 +1,209 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String           @id @default(cuid())
+  email          String           @unique
+  hashedPassword String
+  name           String
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  accounts       Account[]
+  bankConnections BankConnection[]
+  budgets        Budget[]
+  savingsGoals   SavingsGoal[]
+  categoryRules  CategoryRule[]
+  recurringGroups RecurringGroup[]
+  notifications  Notification[]
+  importLogs     ImportLog[]
+
+  @@map("users")
+}
+
+model BankConnection {
+  id            String   @id @default(cuid())
+  userId        String
+  institutionId String
+  institutionName String
+  requisitionId String
+  agreementId   String?
+  status        String   @default("ACTIVE")
+  lastSyncAt    DateTime?
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts Account[]
+
+  @@map("bank_connections")
+}
+
+model Account {
+  id               String  @id @default(cuid())
+  userId           String
+  bankConnectionId String?
+  externalId       String?
+  name             String
+  iban             String?
+  currency         String  @default("EUR")
+  balance          Float   @default(0)
+  type             String  @default("checking")
+  isManual         Boolean @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankConnection BankConnection? @relation(fields: [bankConnectionId], references: [id], onDelete: SetNull)
+  transactions   Transaction[]
+
+  @@map("accounts")
+}
+
+model Transaction {
+  id               String   @id @default(cuid())
+  accountId        String
+  externalId       String?
+  hash             String?  @unique
+  date             DateTime
+  amount           Float
+  currency         String   @default("EUR")
+  description      String   @db.Text
+  merchantName     String?
+  categoryId       String?
+  isRecurring      Boolean  @default(false)
+  recurringGroupId String?
+  notes            String?  @db.Text
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  account        Account         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category       Category?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  recurringGroup RecurringGroup? @relation(fields: [recurringGroupId], references: [id], onDelete: SetNull)
+
+  @@index([accountId, date])
+  @@index([categoryId])
+  @@index([merchantName])
+  @@map("transactions")
+}
+
+model Category {
+  id       String  @id @default(cuid())
+  name     String
+  icon     String
+  color    String
+  type     String  @default("expense")
+  parentId String?
+
+  parent   Category?  @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children Category[] @relation("CategoryHierarchy")
+
+  transactions  Transaction[]
+  categoryRules CategoryRule[]
+  budgets       Budget[]
+  recurringGroups RecurringGroup[]
+
+  @@map("categories")
+}
+
+model CategoryRule {
+  id         String @id @default(cuid())
+  userId     String
+  pattern    String
+  categoryId String
+  priority   Int    @default(0)
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("category_rules")
+}
+
+model Budget {
+  id             String @id @default(cuid())
+  userId         String
+  categoryId     String
+  amount         Float
+  period         String @default("monthly")
+  alertThreshold Float  @default(0.8)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoryId, period])
+  @@map("budgets")
+}
+
+model SavingsGoal {
+  id            String    @id @default(cuid())
+  userId        String
+  name          String
+  targetAmount  Float
+  currentAmount Float     @default(0)
+  deadline      DateTime?
+  icon          String    @default("piggy-bank")
+  color         String    @default("#6366f1")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("savings_goals")
+}
+
+model RecurringGroup {
+  id              String  @id @default(cuid())
+  userId          String
+  merchantName    String
+  estimatedAmount Float
+  frequency       String  @default("monthly")
+  categoryId      String?
+  isActive        Boolean @default(true)
+  lastDetectedAt  DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category     Category?     @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  transactions Transaction[]
+
+  @@map("recurring_groups")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String   @db.Text
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@map("notifications")
+}
+
+model ImportLog {
+  id               String   @id @default(cuid())
+  userId           String
+  filename         String
+  format           String
+  transactionCount Int
+  createdAt        DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("import_logs")
+}
