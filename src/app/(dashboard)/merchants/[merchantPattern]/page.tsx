@@ -230,9 +230,14 @@ export default function MerchantDetailPage() {
                   tickFormatter={(value) => `${value}€`}
                 />
                 <Tooltip
-                  formatter={(value: number | string | undefined) =>
-                    formatCurrency(typeof value === "number" ? value : Number(value || 0))
-                  }
+                  formatter={(value: unknown) => {
+                    const normalized = Array.isArray(value) ? value[0] : value;
+                    const numeric =
+                      typeof normalized === "number"
+                        ? normalized
+                        : Number(String(normalized ?? 0));
+                    return formatCurrency(Number.isFinite(numeric) ? numeric : 0);
+                  }}
                   labelFormatter={(label) => `Période: ${label}`}
                   contentStyle={{
                     borderRadius: "0.75rem",
