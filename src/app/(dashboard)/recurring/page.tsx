@@ -30,6 +30,13 @@ type MerchantTx = {
   category: { name: string } | null;
 };
 
+type MerchantRule = {
+  id: string;
+  merchantPattern: string;
+  excludeFromRecurring: boolean;
+  categoryIds: string[] | null;
+};
+
 export default function RecurringPage() {
   const queryClient = useQueryClient();
   const [autoDetectTriggered, setAutoDetectTriggered] = useState(false);
@@ -48,6 +55,13 @@ export default function RecurringPage() {
     queryKey: ["categories"],
     queryFn: async () => {
       const res = await fetch("/api/categories");
+      return res.json();
+    },
+  });
+  const { data: merchantRules } = useQuery({
+    queryKey: ["recurring-rules"],
+    queryFn: async () => {
+      const res = await fetch("/api/recurring/rules");
       return res.json();
     },
   });
@@ -89,6 +103,7 @@ export default function RecurringPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["recurring"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-rules"] });
     },
   });
 
@@ -119,6 +134,8 @@ export default function RecurringPage() {
   }
 
   const activeGroups: RecurringGroup[] = groups?.filter((g: RecurringGroup) => g.isActive) || [];
+  const excludedMerchants: MerchantRule[] =
+    (merchantRules || []).filter((rule: MerchantRule) => rule.excludeFromRecurring) || [];
   const totalMonthly = activeGroups.reduce(
     (sum: number, g: { estimatedAmount: number; frequency: string }) => {
       if (g.frequency === "weekly") return sum + g.estimatedAmount * 4.33;
@@ -329,6 +346,42 @@ export default function RecurringPage() {
           </table>
         </div>
       )}
+
+      <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Marchands exclus (banlist)
+        </h2>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          Ces marchands ne sont pas pris en compte dans la détection des abonnements.
+        </p>
+        {excludedMerchants.length === 0 ? (
+          <p className="text-sm text-gray-400 mt-4">Aucun marchand exclu.</p>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {excludedMerchants.map((rule) => (
+              <div
+                key={rule.id}
+                className="flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2"
+              >
+                <span className="text-sm font-medium text-gray-900 dark:text-white">
+                  {rule.merchantPattern}
+                </span>
+                <button
+                  onClick={() =>
+                    updateMerchantRule.mutate({
+                      merchantName: rule.merchantPattern,
+                      excludeFromRecurring: false,
+                    })
+                  }
+                  className="rounded-md bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700"
+                >
+                  Réactiver
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

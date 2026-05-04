@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Save, Trash2 } from "lucide-react";
 
 type CategoryNode = {
   id: string;
@@ -23,6 +23,12 @@ export default function SettingsCategoriesPage() {
     type: "expense" as "income" | "expense",
     parentId: "",
   });
+  const [edits, setEdits] = useState<
+    Record<
+      string,
+      { name: string; icon: string; color: string; type: "income" | "expense"; parentId: string }
+    >
+  >({});
 
   const { data: categories, isLoading } = useQuery({
     queryKey: ["categories"],
@@ -62,12 +68,50 @@ export default function SettingsCategoriesPage() {
       queryClient.invalidateQueries({ queryKey: ["categories"] });
     },
   });
+  const updateCategory = useMutation({
+    mutationFn: async ({
+      id,
+      data,
+    }: {
+      id: string;
+      data: { name: string; icon: string; color: string; type: "income" | "expense"; parentId: string };
+    }) => {
+      const res = await fetch("/api/categories", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          name: data.name,
+          icon: data.icon,
+          color: data.color,
+          type: data.type,
+          parentId: data.parentId || null,
+        }),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories"] });
+    },
+  });
 
   const flatCategories = useMemo(
     () =>
       (categories || []).flatMap((parent: CategoryNode) => [parent, ...(parent.children || [])]),
     [categories]
   );
+
+  function getEditState(cat: CategoryNode) {
+    return (
+      edits[cat.id] || {
+        name: cat.name,
+        icon: cat.icon,
+        color: cat.color,
+        type: cat.type,
+        parentId: cat.parentId || "",
+      }
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -150,16 +194,94 @@ export default function SettingsCategoriesPage() {
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {flatCategories.map((cat: CategoryNode) => (
                 <tr key={cat.id}>
-                  <td className="px-4 py-3">{cat.name}</td>
-                  <td className="px-4 py-3">{cat.type === "income" ? "Revenu" : "Dépense"}</td>
-                  <td className="px-4 py-3">{cat.icon}</td>
                   <td className="px-4 py-3">
-                    <span className="inline-flex items-center gap-2">
-                      <span className="h-3 w-3 rounded-full" style={{ backgroundColor: cat.color }} />
-                      {cat.color}
-                    </span>
+                    <input
+                      value={getEditState(cat).name}
+                      onChange={(e) =>
+                        setEdits((prev) => ({
+                          ...prev,
+                          [cat.id]: { ...getEditState(cat), name: e.target.value },
+                        }))
+                      }
+                      className="h-9 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <select
+                      value={getEditState(cat).type}
+                      onChange={(e) =>
+                        setEdits((prev) => ({
+                          ...prev,
+                          [cat.id]: {
+                            ...getEditState(cat),
+                            type: e.target.value as "income" | "expense",
+                          },
+                        }))
+                      }
+                      className="h-9 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2"
+                    >
+                      <option value="expense">Dépense</option>
+                      <option value="income">Revenu</option>
+                    </select>
+                  </td>
+                  <td className="px-4 py-3">
+                    <input
+                      value={getEditState(cat).icon}
+                      onChange={(e) =>
+                        setEdits((prev) => ({
+                          ...prev,
+                          [cat.id]: { ...getEditState(cat), icon: e.target.value },
+                        }))
+                      }
+                      className="h-9 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="color"
+                        value={getEditState(cat).color}
+                        onChange={(e) =>
+                          setEdits((prev) => ({
+                            ...prev,
+                            [cat.id]: { ...getEditState(cat), color: e.target.value },
+                          }))
+                        }
+                        className="h-9 w-12 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 p-1"
+                      />
+                      <select
+                        value={getEditState(cat).parentId}
+                        onChange={(e) =>
+                          setEdits((prev) => ({
+                            ...prev,
+                            [cat.id]: { ...getEditState(cat), parentId: e.target.value },
+                          }))
+                        }
+                        className="h-9 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2 text-xs"
+                      >
+                        <option value="">Pas de parent</option>
+                        {(categories || [])
+                          .filter((parent: CategoryNode) => parent.id !== cat.id)
+                          .map((parent: CategoryNode) => (
+                            <option key={parent.id} value={parent.id}>
+                              {parent.name}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-right">
+                    <button
+                      onClick={() =>
+                        updateCategory.mutate({
+                          id: cat.id,
+                          data: getEditState(cat),
+                        })
+                      }
+                      className="mr-2 inline-flex items-center gap-1 rounded-md border border-indigo-200 px-2 py-1 text-indigo-600 hover:bg-indigo-50"
+                    >
+                      <Save className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => deleteCategory.mutate(cat.id)}
                       className="inline-flex items-center gap-1 rounded-md border border-red-200 px-2 py-1 text-red-600 hover:bg-red-50"
