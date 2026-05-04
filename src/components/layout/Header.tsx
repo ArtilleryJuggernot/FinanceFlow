@@ -24,6 +24,13 @@ export function Header() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            className="hidden md:inline-flex h-9 items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-700 px-3 text-xs text-gray-500 dark:text-gray-400"
+            onClick={() => window.dispatchEvent(new Event("open-command-palette"))}
+          >
+            Recherche rapide
+            <span className="rounded border border-gray-200 dark:border-gray-700 px-1.5 py-0.5">Ctrl K</span>
+          </button>
           {mounted && (
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}

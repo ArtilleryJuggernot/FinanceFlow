@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
+import { CommandPalette } from "@/components/layout/CommandPalette";
 
 export default function DashboardLayout({
   children,
@@ -9,6 +10,7 @@ export default function DashboardLayout({
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       <Sidebar />
+      <CommandPalette />
       <div className="pl-[260px] transition-all duration-300">
         <Header />
         <main className="p-6">{children}</main>

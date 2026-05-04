@@ -27,3 +27,8 @@
 ## UI consistency
 - Dropdown de catégorie identique entre transactions et recurring.
 - Catégories: toujours proposer vue tableau + vue arborescence.
+- Maintenir `/guide` à jour à chaque nouvelle fonctionnalité (concept, usage, FAQ, exemples).
+- Maintenir la recherche rapide `Ctrl+K` avec:
+  - sections de la sidebar,
+  - marchands (alias/displayName inclus),
+  - navigation directe.

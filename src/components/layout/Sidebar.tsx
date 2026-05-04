@@ -12,6 +12,7 @@ import {
   Building2,
   Settings,
   Bot,
+  BookOpen,
   Landmark,
   ChevronLeft,
   ChevronRight,
@@ -28,6 +29,7 @@ const navItems = [
   { href: "/accounts", label: "Comptes", icon: Building2 },
   { href: "/settings/categories", label: "Catégories", icon: Settings },
   { href: "/ai", label: "Intelligence IA", icon: Bot },
+  { href: "/guide", label: "Guide", icon: BookOpen },
   { href: "/settings", label: "Paramètres", icon: Settings },
 ];
 
