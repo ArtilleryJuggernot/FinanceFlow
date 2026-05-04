@@ -7,6 +7,7 @@ import { normalizeMerchantName } from "@/lib/merchant";
 const updateRuleSchema = z
   .object({
     merchantName: z.string().min(1).optional(),
+    merchantId: z.string().min(1).optional(),
     merchantPattern: z.string().min(1).optional(),
     excludeFromRecurring: z.boolean().optional(),
     categoryIds: z.array(z.string()).optional(),
@@ -14,8 +15,8 @@ const updateRuleSchema = z
     notes: z.string().optional(),
     avatarUrl: z.string().optional(),
   })
-  .refine((v) => !!v.merchantName || !!v.merchantPattern, {
-    message: "merchantName ou merchantPattern requis",
+  .refine((v) => !!v.merchantName || !!v.merchantPattern || !!v.merchantId, {
+    message: "merchantName ou merchantPattern ou merchantId requis",
   });
 
 export async function GET() {
@@ -45,8 +46,21 @@ export async function PATCH(request: Request) {
     }
 
     const payload = updateRuleSchema.parse(await request.json());
-    const merchantPattern =
+    let merchantPattern =
       payload.merchantPattern || normalizeMerchantName(payload.merchantName || "");
+
+    if (payload.merchantId) {
+      const byId = await prisma.merchantRule.findFirst({
+        where: {
+          userId: session.user.id,
+          publicId: payload.merchantId,
+        },
+        select: { merchantPattern: true },
+      });
+      if (byId?.merchantPattern) {
+        merchantPattern = byId.merchantPattern;
+      }
+    }
     const recurringGroups = await prisma.recurringGroup.findMany({
       where: { userId: session.user.id },
       select: { id: true, merchantName: true },

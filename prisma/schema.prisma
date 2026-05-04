@@ -92,6 +92,7 @@ model AiActionExecution {
 
 model MerchantRule {
   id                    String   @id @default(cuid())
+  publicId              String   @unique @default(uuid())
   userId                String
   merchantPattern       String
   displayName           String?

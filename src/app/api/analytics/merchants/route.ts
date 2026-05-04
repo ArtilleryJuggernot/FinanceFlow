@@ -95,11 +95,39 @@ export async function GET(request: Request) {
       item.categorySpend[categoryName] = (item.categorySpend[categoryName] || 0) + Math.abs(tx.amount);
     }
 
+    // Ensure each discovered merchant has a persistent UUID profile.
+    for (const pattern of grouped.keys()) {
+      if (!rules.find((r) => r.merchantPattern === pattern)) {
+        await prisma.merchantRule.upsert({
+          where: {
+            userId_merchantPattern: {
+              userId: session.user.id,
+              merchantPattern: pattern,
+            },
+          },
+          update: {},
+          create: {
+            userId: session.user.id,
+            merchantPattern: pattern,
+          },
+        });
+      }
+    }
+
+    const persistedRules = await prisma.merchantRule.findMany({
+      where: { userId: session.user.id },
+    });
+
     const computedMerchants = Array.from(grouped.values()).map((m) => {
+      const persisted = persistedRules.find((r) => r.merchantPattern === m.merchantPattern);
       const topEntry =
         Object.entries(m.categorySpend).sort((a, b) => b[1] - a[1])[0] || ["Non catégorisé", 0];
       return {
         ...m,
+        merchantId: persisted?.publicId || null,
+        displayName: persisted?.displayName || m.displayName,
+        avatarUrl: persisted?.avatarUrl || m.avatarUrl,
+        notes: persisted?.notes || m.notes,
         topCategory: topEntry[0],
       };
     });

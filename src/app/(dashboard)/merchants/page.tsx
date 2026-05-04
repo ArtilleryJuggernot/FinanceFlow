@@ -20,6 +20,7 @@ type SortDirection = "asc" | "desc" | "normal";
 type SortKey = "displayName" | "topCategory" | "transactionCount" | "averageAmount" | "totalSpent";
 
 type MerchantItem = {
+  merchantId: string | null;
   merchantName: string;
   merchantPattern: string;
   displayName: string;
@@ -86,6 +87,7 @@ export default function MerchantsPage() {
   const updateMerchant = useMutation({
     mutationFn: async (payload: {
       merchantName: string;
+      merchantId?: string;
       merchantPattern?: string;
       displayName?: string;
       avatarUrl?: string;
@@ -108,10 +110,12 @@ export default function MerchantsPage() {
   const uploadMerchantAvatar = useMutation({
     mutationFn: async ({
       merchantName,
+      merchantId,
       merchantPattern,
       file,
     }: {
       merchantName: string;
+      merchantId: string;
       merchantPattern: string;
       file: File;
     }) => {
@@ -130,6 +134,7 @@ export default function MerchantsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           merchantName,
+          merchantId,
           merchantPattern,
           avatarUrl: uploadData.url,
         }),
@@ -498,7 +503,11 @@ export default function MerchantsPage() {
                           )}
                           <div className="min-w-0">
                             <Link
-                              href={`/merchants/${encodeURIComponent(merchant.merchantPattern)}`}
+                              href={
+                                merchant.merchantId
+                                  ? `/merchants/${encodeURIComponent(merchant.merchantId)}`
+                                  : "/merchants"
+                              }
                               className="font-medium text-gray-900 dark:text-white hover:text-indigo-600"
                             >
                               {merchant.displayName}
@@ -642,6 +651,7 @@ export default function MerchantsPage() {
                       uploadMerchantAvatar.mutate(
                         {
                           merchantName: editingMerchant.merchantName,
+                                  merchantId: editingMerchant.merchantId || editingMerchant.merchantPattern,
                                   merchantPattern: editingMerchant.merchantPattern,
                           file,
                         },
@@ -650,6 +660,7 @@ export default function MerchantsPage() {
                             setProfileDraft((prev) => ({ ...prev, avatarUrl: uploadData.url }));
                             updateMerchant.mutate({
                               merchantName: editingMerchant.merchantName,
+                                      merchantId: editingMerchant.merchantId || undefined,
                                       merchantPattern: editingMerchant.merchantPattern,
                               avatarUrl: uploadData.url,
                             });
@@ -744,6 +755,7 @@ export default function MerchantsPage() {
                 onClick={() =>
                   updateMerchant.mutate({
                     merchantName: editingMerchant.merchantName,
+                    merchantId: editingMerchant.merchantId || undefined,
                     merchantPattern: editingMerchant.merchantPattern,
                     displayName: profileDraft.displayName,
                     avatarUrl: profileDraft.avatarUrl,

@@ -15,9 +15,15 @@ export async function GET(
 
     const { merchantPattern } = await params;
     const decoded = decodeURIComponent(merchantPattern);
-    const rule = await prisma.merchantRule.findFirst({
-      where: { userId: session.user.id, merchantPattern: decoded },
+    const ruleById = await prisma.merchantRule.findFirst({
+      where: { userId: session.user.id, publicId: decoded },
     });
+    const effectivePattern = ruleById?.merchantPattern || decoded;
+    const rule =
+      ruleById ||
+      (await prisma.merchantRule.findFirst({
+        where: { userId: session.user.id, merchantPattern: effectivePattern },
+      }));
 
     const txs = await prisma.transaction.findMany({
       where: {
@@ -36,7 +42,7 @@ export async function GET(
     });
 
     const transactions = txs.filter(
-      (tx) => tx.merchantName && normalizeMerchantName(tx.merchantName) === decoded
+      (tx) => tx.merchantName && normalizeMerchantName(tx.merchantName) === effectivePattern
     );
     const totalSpent = transactions.reduce((sum, t) => sum + Math.abs(t.amount), 0);
     const avgAmount = transactions.length ? totalSpent / transactions.length : 0;
@@ -48,7 +54,8 @@ export async function GET(
     }
 
     return NextResponse.json({
-      merchantPattern: decoded,
+      merchantPattern: effectivePattern,
+      merchantId: rule?.publicId || null,
       profile: rule || null,
       stats: {
         transactionCount: transactions.length,

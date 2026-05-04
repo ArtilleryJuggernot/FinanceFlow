@@ -7,12 +7,12 @@ import { formatCurrency, formatDateShort } from "@/lib/utils";
 
 export default function MerchantDetailPage() {
   const params = useParams<{ merchantPattern: string }>();
-  const pattern = decodeURIComponent(params.merchantPattern);
+  const merchantRef = decodeURIComponent(params.merchantPattern);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["merchant-detail", pattern],
+    queryKey: ["merchant-detail", merchantRef],
     queryFn: async () => {
-      const res = await fetch(`/api/merchants/${encodeURIComponent(pattern)}`);
+      const res = await fetch(`/api/merchants/${encodeURIComponent(merchantRef)}`);
       return res.json();
     },
   });
@@ -29,9 +29,9 @@ export default function MerchantDetailPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {data?.profile?.displayName || pattern}
+          {data?.profile?.displayName || data?.merchantPattern || merchantRef}
         </h1>
-        <p className="text-gray-500 dark:text-gray-400">{pattern}</p>
+        <p className="text-gray-500 dark:text-gray-400">{data?.merchantPattern || merchantRef}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
