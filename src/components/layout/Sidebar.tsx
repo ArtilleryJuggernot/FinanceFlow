@@ -25,6 +25,7 @@ const navItems = [
   { href: "/merchants", label: "Marchands", icon: Building2 },
   { href: "/goals", label: "Objectifs", icon: PiggyBank },
   { href: "/accounts", label: "Comptes", icon: Building2 },
+  { href: "/settings/categories", label: "Catégories", icon: Settings },
   { href: "/settings", label: "Paramètres", icon: Settings },
 ];
 

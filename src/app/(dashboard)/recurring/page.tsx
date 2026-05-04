@@ -1,9 +1,10 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { Loader2, Repeat, RefreshCw, ChevronDown, X } from "lucide-react";
 import { cn, formatCurrency, formatDateShort } from "@/lib/utils";
+import { CategoryBadge } from "@/components/transactions/CategoryBadge";
 
 type RecurringGroup = {
   id: string;
@@ -18,7 +19,9 @@ type RecurringGroup = {
 type CategoryItem = {
   id: string;
   name: string;
-  children?: { id: string; name: string }[];
+  color?: string | null;
+  icon?: string | null;
+  children?: { id: string; name: string; color?: string | null; icon?: string | null }[];
 };
 
 type MerchantTx = {
@@ -49,7 +52,8 @@ export default function RecurringPage() {
     },
   });
   const [openMerchant, setOpenMerchant] = useState<string | null>(null);
-  const [selectedCategories, setSelectedCategories] = useState<Record<string, string[]>>({});
+  const [openCategoryDropdown, setOpenCategoryDropdown] = useState<string | null>(null);
+  const categoryDropdownRef = useRef<HTMLDivElement>(null);
 
   const { data: categories } = useQuery({
     queryKey: ["categories"],
@@ -115,13 +119,27 @@ export default function RecurringPage() {
     }
   }, [isLoading, groups, autoDetectTriggered, detect]);
 
+  useEffect(() => {
+    if (!openCategoryDropdown) return;
+    const onMouseDown = (event: MouseEvent) => {
+      if (
+        categoryDropdownRef.current &&
+        !categoryDropdownRef.current.contains(event.target as Node)
+      ) {
+        setOpenCategoryDropdown(null);
+      }
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [openCategoryDropdown]);
+
   const freqLabel: Record<string, string> = {
     weekly: "Hebdomadaire",
     monthly: "Mensuel",
     quarterly: "Trimestriel",
     yearly: "Annuel",
   };
-  const allCategories: { id: string; name: string }[] = (categories || []).flatMap(
+  const allCategories: { id: string; name: string; color?: string | null; icon?: string | null }[] = (categories || []).flatMap(
     (parent: CategoryItem) => [parent, ...(parent.children || [])]
   );
 
@@ -210,7 +228,7 @@ export default function RecurringPage() {
                   Montant
                 </th>
                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
-                  Catégories associées
+                  Catégorie
                 </th>
                 <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">
                   Action
@@ -260,32 +278,60 @@ export default function RecurringPage() {
                       -{formatCurrency(g.estimatedAmount)}
                     </td>
                     <td className="px-6 py-4">
-                      <select
-                        multiple
-                        value={selectedCategories[g.id] || (g.merchantRule?.categoryIds || [])}
-                        onChange={(e) => {
-                          const values = Array.from(e.target.selectedOptions).map((o) => o.value);
-                          setSelectedCategories((prev) => ({ ...prev, [g.id]: values }));
-                        }}
-                        className="min-w-[220px] h-24 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1 text-sm"
+                      <div
+                        className="relative"
+                        ref={openCategoryDropdown === g.id ? categoryDropdownRef : undefined}
                       >
-                        {allCategories.map((cat) => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.name}
-                          </option>
-                        ))}
-                      </select>
-                      <button
-                        onClick={() =>
-                          updateMerchantRule.mutate({
-                            merchantName: g.merchantName,
-                            categoryIds: selectedCategories[g.id] || g.merchantRule?.categoryIds || [],
-                          })
-                        }
-                        className="mt-2 inline-flex items-center rounded-md bg-indigo-600 px-2 py-1 text-xs text-white hover:bg-indigo-700"
-                      >
-                        Enregistrer
-                      </button>
+                        <button
+                          onClick={() =>
+                            setOpenCategoryDropdown((prev) => (prev === g.id ? null : g.id))
+                          }
+                          className="group flex items-center gap-1 cursor-pointer"
+                        >
+                          <CategoryBadge
+                            name={g.category?.name}
+                            color={g.category?.color}
+                            icon={null}
+                          />
+                          <ChevronDown className="w-3 h-3 text-gray-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </button>
+
+                        {openCategoryDropdown === g.id && (
+                          <div className="absolute top-full left-0 z-50 mt-1 w-64 max-h-72 overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl">
+                            <div className="p-2">
+                              <div className="px-2 py-1.5 text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
+                                Choisir une catégorie
+                              </div>
+                              {allCategories.map((cat) => (
+                                <button
+                                  key={cat.id}
+                                  onClick={() => {
+                                    updateMerchantRule.mutate({
+                                      merchantName: g.merchantName,
+                                      categoryIds: [cat.id],
+                                    });
+                                    setOpenCategoryDropdown(null);
+                                  }}
+                                  className={cn(
+                                    "w-full flex items-center gap-2 px-2 py-1.5 rounded-md text-sm text-left transition-colors",
+                                    "hover:bg-gray-100 dark:hover:bg-gray-800",
+                                    g.category?.id === cat.id && "bg-gray-100 dark:bg-gray-800"
+                                  )}
+                                >
+                                  <span
+                                    className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                    style={{ backgroundColor: cat.color || "#9ca3af" }}
+                                  />
+                                  {cat.icon && <span className="text-xs">{cat.icon}</span>}
+                                  <span className="text-gray-700 dark:text-gray-300 truncate">
+                                    {cat.name}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-right">
                       <button
