@@ -8,6 +8,7 @@ export const runtime = "nodejs";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
+const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 
 function extensionFromType(type: string): string {
   if (type === "image/png") return "png";
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(filePath, buffer);
 
-    const relativeUrl = `/uploads/merchants/${filename}`;
+    const relativeUrl = `/uploads/merchants/${encodeURIComponent(filename)}`;
     const origin = new URL(request.url).origin;
 
     return NextResponse.json({
@@ -81,14 +82,18 @@ export async function GET(request: Request) {
 
     const files = await readdir(uploadDir);
     const filtered = files
-      .filter((filename) => !search || filename.toLowerCase().includes(search))
+      .filter((filename) => {
+        const lower = filename.toLowerCase();
+        const hasValidExt = Array.from(ALLOWED_EXTENSIONS).some((ext) => lower.endsWith(ext));
+        return hasValidExt && (!search || lower.includes(search));
+      })
       .slice(0, limit);
 
     const items = await Promise.all(
       filtered.map(async (filename) => {
         const filePath = path.join(uploadDir, filename);
         const info = await stat(filePath);
-        const url = `/uploads/merchants/${filename}`;
+        const url = `/uploads/merchants/${encodeURIComponent(filename)}`;
         return {
           filename,
           url,

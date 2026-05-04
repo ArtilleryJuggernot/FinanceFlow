@@ -15,6 +15,14 @@ import {
   YAxis,
 } from "recharts";
 
+function normalizeDisplayImageUrl(url?: string | null): string {
+  if (!url) return "";
+  const cleaned = url.trim().replace(/\\/g, "/");
+  if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) return cleaned;
+  if (cleaned.startsWith("/")) return cleaned;
+  return `/${cleaned}`;
+}
+
 export default function MerchantDetailPage() {
   const queryClient = useQueryClient();
   const params = useParams<{ merchantPattern: string }>();
@@ -175,7 +183,7 @@ export default function MerchantDetailPage() {
           {avatarUrlDraft && !avatarBroken ? (
             <div className="h-14 w-28 overflow-hidden rounded-md bg-gray-50 p-1 dark:bg-gray-800">
               <img
-                src={avatarUrlDraft}
+                src={normalizeDisplayImageUrl(avatarUrlDraft)}
                 alt={displayNameDraft || merchantRef}
                 className="h-full w-full object-contain"
                 onError={() => setAvatarBroken(true)}

@@ -32,6 +32,14 @@ type MerchantItem = {
   totalSpent: number;
 };
 
+function normalizeDisplayImageUrl(url?: string | null): string {
+  if (!url) return "";
+  const cleaned = url.trim().replace(/\\/g, "/");
+  if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) return cleaned;
+  if (cleaned.startsWith("/")) return cleaned;
+  return `/${cleaned}`;
+}
+
 export default function MerchantsPage() {
   const queryClient = useQueryClient();
   const [dateFrom, setDateFrom] = useState("");
@@ -496,7 +504,7 @@ export default function MerchantsPage() {
                           {merchant.avatarUrl && !brokenAvatars[merchant.merchantPattern] ? (
                             <div className="h-8 w-14 overflow-hidden rounded-md bg-gray-50 p-0.5 dark:bg-gray-800">
                               <img
-                                src={merchant.avatarUrl}
+                                src={normalizeDisplayImageUrl(merchant.avatarUrl)}
                                 alt={merchant.displayName}
                                 className="h-full w-full object-contain"
                                 onError={() =>
@@ -683,7 +691,7 @@ export default function MerchantsPage() {
                 {profileDraft.avatarUrl ? (
                   <div className="h-12 w-24 overflow-hidden rounded-md bg-gray-50 p-1 dark:bg-gray-800">
                     <img
-                      src={profileDraft.avatarUrl}
+                      src={normalizeDisplayImageUrl(profileDraft.avatarUrl)}
                       alt={profileDraft.displayName || editingMerchant.merchantName}
                       className="h-full w-full object-contain"
                     />

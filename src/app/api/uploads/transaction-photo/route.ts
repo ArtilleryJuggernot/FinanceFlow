@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(filePath, buffer);
 
-    const relativeUrl = `/uploads/transactions/${filename}`;
+    const relativeUrl = `/uploads/transactions/${encodeURIComponent(filename)}`;
     const origin = new URL(request.url).origin;
     return NextResponse.json({
       url: relativeUrl,

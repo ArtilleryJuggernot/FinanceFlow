@@ -19,6 +19,16 @@ const updateRuleSchema = z
     message: "merchantName ou merchantPattern ou merchantId requis",
   });
 
+function normalizeImageUrl(url: string | undefined): string | undefined {
+  if (url === undefined) return undefined;
+  const cleaned = url.trim().replace(/\\/g, "/");
+  if (!cleaned) return "";
+  if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) return cleaned;
+  if (cleaned.startsWith("/uploads/")) return cleaned;
+  if (cleaned.startsWith("uploads/")) return `/${cleaned}`;
+  return cleaned;
+}
+
 export async function GET() {
   try {
     const session = await auth();
@@ -46,6 +56,7 @@ export async function PATCH(request: Request) {
     }
 
     const payload = updateRuleSchema.parse(await request.json());
+    const normalizedAvatarUrl = normalizeImageUrl(payload.avatarUrl);
     let merchantPattern =
       payload.merchantPattern || normalizeMerchantName(payload.merchantName || "");
 
@@ -83,7 +94,7 @@ export async function PATCH(request: Request) {
         ...(payload.categoryIds !== undefined && { categoryIds: payload.categoryIds }),
         ...(payload.displayName !== undefined && { displayName: payload.displayName }),
         ...(payload.notes !== undefined && { notes: payload.notes }),
-        ...(payload.avatarUrl !== undefined && { avatarUrl: payload.avatarUrl }),
+        ...(normalizedAvatarUrl !== undefined && { avatarUrl: normalizedAvatarUrl }),
       },
       create: {
         userId: session.user.id,
@@ -92,7 +103,7 @@ export async function PATCH(request: Request) {
         categoryIds: payload.categoryIds ?? [],
         displayName: payload.displayName,
         notes: payload.notes,
-        avatarUrl: payload.avatarUrl,
+        avatarUrl: normalizedAvatarUrl,
       },
     });
 
