@@ -494,19 +494,21 @@ export default function MerchantsPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           {merchant.avatarUrl && !brokenAvatars[merchant.merchantPattern] ? (
-                            <img
-                              src={merchant.avatarUrl}
-                              alt={merchant.displayName}
-                              className="h-8 w-8 rounded-full object-cover"
-                              onError={() =>
-                                setBrokenAvatars((prev) => ({
-                                  ...prev,
-                                  [merchant.merchantPattern]: true,
-                                }))
-                              }
-                            />
+                            <div className="h-8 w-14 overflow-hidden rounded-md bg-gray-50 p-0.5 dark:bg-gray-800">
+                              <img
+                                src={merchant.avatarUrl}
+                                alt={merchant.displayName}
+                                className="h-full w-full object-contain"
+                                onError={() =>
+                                  setBrokenAvatars((prev) => ({
+                                    ...prev,
+                                    [merchant.merchantPattern]: true,
+                                  }))
+                                }
+                              />
+                            </div>
                           ) : (
-                            <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900" />
+                            <div className="h-8 w-14 rounded-md bg-indigo-100 dark:bg-indigo-900" />
                           )}
                           <div className="min-w-0">
                             <Link
@@ -679,13 +681,15 @@ export default function MerchantsPage() {
                   />
                 </label>
                 {profileDraft.avatarUrl ? (
-                  <img
-                    src={profileDraft.avatarUrl}
-                    alt={profileDraft.displayName || editingMerchant.merchantName}
-                    className="h-12 w-12 rounded-full object-cover"
-                  />
+                  <div className="h-12 w-24 overflow-hidden rounded-md bg-gray-50 p-1 dark:bg-gray-800">
+                    <img
+                      src={profileDraft.avatarUrl}
+                      alt={profileDraft.displayName || editingMerchant.merchantName}
+                      className="h-full w-full object-contain"
+                    />
+                  </div>
                 ) : (
-                  <div className="h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-800" />
+                  <div className="h-12 w-24 rounded-md bg-gray-100 dark:bg-gray-800" />
                 )}
               </div>
 
@@ -717,14 +721,16 @@ export default function MerchantsPage() {
                           }
                           className="flex w-full items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
                         >
-                          <img
-                            src={item.url}
-                            alt={item.filename}
-                            className="h-8 w-8 rounded object-cover"
-                            onError={(e) => {
-                              (e.currentTarget as HTMLImageElement).style.display = "none";
-                            }}
-                          />
+                          <div className="h-8 w-14 overflow-hidden rounded bg-gray-50 p-0.5 dark:bg-gray-800">
+                            <img
+                              src={item.url}
+                              alt={item.filename}
+                              className="h-full w-full object-contain"
+                              onError={(e) => {
+                                (e.currentTarget as HTMLImageElement).style.display = "none";
+                              }}
+                            />
+                          </div>
                           <div className="min-w-0">
                             <p className="truncate text-xs text-gray-700 dark:text-gray-200">
                               {item.filename}

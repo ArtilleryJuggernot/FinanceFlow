@@ -173,14 +173,16 @@ export default function MerchantDetailPage() {
       <div>
         <div className="flex items-center gap-3">
           {avatarUrlDraft && !avatarBroken ? (
-            <img
-              src={avatarUrlDraft}
-              alt={displayNameDraft || merchantRef}
-              className="h-14 w-14 rounded-full object-cover"
-              onError={() => setAvatarBroken(true)}
-            />
+            <div className="h-14 w-28 overflow-hidden rounded-md bg-gray-50 p-1 dark:bg-gray-800">
+              <img
+                src={avatarUrlDraft}
+                alt={displayNameDraft || merchantRef}
+                className="h-full w-full object-contain"
+                onError={() => setAvatarBroken(true)}
+              />
+            </div>
           ) : (
-            <div className="h-14 w-14 rounded-full bg-gray-100 dark:bg-gray-800" />
+            <div className="h-14 w-28 rounded-md bg-gray-100 dark:bg-gray-800" />
           )}
           <div className="min-w-0">
             <input
@@ -252,14 +254,16 @@ export default function MerchantDetailPage() {
                       }}
                       className="flex w-full items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
                     >
-                      <img
-                        src={item.url}
-                        alt={item.filename}
-                        className="h-8 w-8 rounded object-cover"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).style.display = "none";
-                        }}
-                      />
+                      <div className="h-8 w-14 overflow-hidden rounded bg-gray-50 p-0.5 dark:bg-gray-800">
+                        <img
+                          src={item.url}
+                          alt={item.filename}
+                          className="h-full w-full object-contain"
+                          onError={(e) => {
+                            (e.currentTarget as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      </div>
                       <div className="min-w-0">
                         <p className="truncate text-xs text-gray-700 dark:text-gray-200">{item.filename}</p>
                         <p className="text-[10px] text-gray-500 dark:text-gray-400">

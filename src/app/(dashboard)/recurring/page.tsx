@@ -264,11 +264,13 @@ export default function RecurringPage() {
                         {g.merchantRule?.displayName || g.merchantName}
                       </button>
                       {g.merchantRule?.avatarUrl && (
-                        <img
-                          src={g.merchantRule.avatarUrl}
-                          alt={g.merchantRule.displayName || g.merchantName}
-                          className="mt-2 h-7 w-7 rounded-full object-cover"
-                        />
+                        <div className="mt-2 h-8 w-14 overflow-hidden rounded-md bg-gray-50 p-0.5 dark:bg-gray-800">
+                          <img
+                            src={g.merchantRule.avatarUrl}
+                            alt={g.merchantRule.displayName || g.merchantName}
+                            className="h-full w-full object-contain"
+                          />
+                        </div>
                       )}
                     </td>
                     <td className="px-6 py-4">
