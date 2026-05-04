@@ -4,6 +4,8 @@ set -euo pipefail
 # Usage:
 #   ./scripts/deploy-smart.sh
 #   ./scripts/deploy-smart.sh <from_commit> <to_commit>
+#   ./scripts/deploy-smart.sh --force-prisma
+#   ./scripts/deploy-smart.sh --force-prisma <from_commit> <to_commit>
 #
 # Behavior:
 # - Runs `sudo npm i` only when dependency files changed.
@@ -13,8 +15,24 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-if [[ "${1-}" != "" && "${2-}" != "" ]]; then
-  RANGE="$1..$2"
+FORCE_PRISMA=false
+POSITIONAL_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --force-prisma)
+      FORCE_PRISMA=true
+      shift
+      ;;
+    *)
+      POSITIONAL_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+if [[ "${#POSITIONAL_ARGS[@]}" -ge 2 ]]; then
+  RANGE="${POSITIONAL_ARGS[0]}..${POSITIONAL_ARGS[1]}"
 elif git rev-parse --verify ORIG_HEAD >/dev/null 2>&1; then
   RANGE="ORIG_HEAD..HEAD"
 elif git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
@@ -52,6 +70,11 @@ fi
 
 if echo "$CHANGED_FILES" | grep -E '(^|/)(prisma/schema\.prisma|prisma/migrations/)' >/dev/null 2>&1; then
   needs_prisma=true
+fi
+
+if [[ "$FORCE_PRISMA" == true ]]; then
+  needs_prisma=true
+  echo "-> Force prisma enabled (--force-prisma)"
 fi
 
 if [[ "$needs_npm_install" == true ]]; then
