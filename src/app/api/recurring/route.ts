@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { normalizeMerchantName } from "@/lib/merchant";
 
 export async function GET() {
   try {
@@ -20,8 +21,8 @@ export async function GET() {
     });
 
     const enriched = groups.map((group) => {
-      const matchedRule = rules.find((rule) =>
-        group.merchantName.toLowerCase().includes(rule.merchantPattern.toLowerCase())
+      const matchedRule = rules.find(
+        (rule) => normalizeMerchantName(group.merchantName) === rule.merchantPattern
       );
       return {
         ...group,
@@ -29,6 +30,9 @@ export async function GET() {
           ? {
               excludeFromRecurring: matchedRule.excludeFromRecurring,
               categoryIds: matchedRule.categoryIds ?? [],
+              displayName: matchedRule.displayName,
+              avatarUrl: matchedRule.avatarUrl,
+              notes: matchedRule.notes,
             }
           : null,
       };

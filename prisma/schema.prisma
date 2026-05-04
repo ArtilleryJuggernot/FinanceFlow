@@ -31,6 +31,9 @@ model MerchantRule {
   id                    String   @id @default(cuid())
   userId                String
   merchantPattern       String
+  displayName           String?
+  notes                 String?  @db.Text
+  avatarUrl             String?
   excludeFromRecurring  Boolean  @default(false)
   categoryIds           Json?
   createdAt             DateTime @default(now())

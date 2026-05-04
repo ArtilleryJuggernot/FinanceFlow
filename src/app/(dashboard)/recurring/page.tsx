@@ -13,7 +13,13 @@ type RecurringGroup = {
   frequency: string;
   isActive: boolean;
   category: { id: string; name: string; color: string } | null;
-  merchantRule: { excludeFromRecurring: boolean; categoryIds: string[] } | null;
+  merchantRule: {
+    excludeFromRecurring: boolean;
+    categoryIds: string[];
+    displayName?: string | null;
+    avatarUrl?: string | null;
+    notes?: string | null;
+  } | null;
 };
 
 type CategoryItem = {
@@ -96,6 +102,9 @@ export default function RecurringPage() {
       merchantName: string;
       excludeFromRecurring?: boolean;
       categoryIds?: string[];
+      displayName?: string;
+      notes?: string;
+      avatarUrl?: string;
     }) => {
       const res = await fetch("/api/recurring/rules", {
         method: "PATCH",
@@ -252,8 +261,15 @@ export default function RecurringPage() {
                             openMerchant === g.merchantName && "rotate-180"
                           )}
                         />
-                        {g.merchantName}
+                        {g.merchantRule?.displayName || g.merchantName}
                       </button>
+                      {g.merchantRule?.avatarUrl && (
+                        <img
+                          src={g.merchantRule.avatarUrl}
+                          alt={g.merchantRule.displayName || g.merchantName}
+                          className="mt-2 h-7 w-7 rounded-full object-cover"
+                        />
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       {g.category ? (
@@ -362,6 +378,17 @@ export default function RecurringPage() {
                           </p>
                         ) : (
                           <div className="space-y-2">
+                            <textarea
+                              defaultValue={g.merchantRule?.notes || ""}
+                              onBlur={(e) =>
+                                updateMerchantRule.mutate({
+                                  merchantName: g.merchantName,
+                                  notes: e.target.value,
+                                })
+                              }
+                              placeholder="Notes sur ce marchand..."
+                              className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-600 dark:text-gray-300"
+                            />
                             {merchantTransactions.map((tx: MerchantTx) => (
                               <div
                                 key={tx.id}

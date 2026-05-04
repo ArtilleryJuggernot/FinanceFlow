@@ -90,6 +90,20 @@ export default function TransactionsPage() {
     },
   });
 
+  const updateNotes = useMutation({
+    mutationFn: async ({ txId, notes }: { txId: string; notes: string }) => {
+      const res = await fetch("/api/transactions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: txId, notes }),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    },
+  });
+
   const categorizeAll = useMutation({
     mutationFn: async () => {
       const res = await fetch("/api/transactions/categorize", { method: "POST" });
@@ -239,6 +253,7 @@ export default function TransactionsPage() {
           onUpdateCategory={(txId, categoryId) =>
             updateCategory.mutate({ txId, categoryId })
           }
+          onUpdateNotes={(txId, notes) => updateNotes.mutate({ txId, notes })}
           pagination={{
             page: data?.pagination?.page || 1,
             totalPages: data?.pagination?.totalPages || 1,

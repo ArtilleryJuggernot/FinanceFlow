@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { normalizeMerchantName } from "@/lib/merchant";
 
 export async function GET(request: Request) {
   try {
@@ -39,7 +40,7 @@ export async function GET(request: Request) {
     if (type === "income") where.amount = { gt: 0 };
     if (type === "expense") where.amount = { lt: 0 };
 
-    const [transactions, total] = await Promise.all([
+    const [transactions, total, rules] = await Promise.all([
       prisma.transaction.findMany({
         where,
         include: {
@@ -51,10 +52,30 @@ export async function GET(request: Request) {
         take: limit,
       }),
       prisma.transaction.count({ where }),
+      prisma.merchantRule.findMany({
+        where: { userId: session.user.id },
+        select: { merchantPattern: true, displayName: true, avatarUrl: true, notes: true },
+      }),
     ]);
 
+    const mappedTransactions = transactions.map((tx) => {
+      if (!tx.merchantName) return tx;
+      const normalized = normalizeMerchantName(tx.merchantName);
+      const profile = rules.find((r) => r.merchantPattern === normalized);
+      return {
+        ...tx,
+        merchantProfile: profile
+          ? {
+              displayName: profile.displayName,
+              avatarUrl: profile.avatarUrl,
+              notes: profile.notes,
+            }
+          : null,
+      };
+    });
+
     return NextResponse.json({
-      transactions,
+      transactions: mappedTransactions,
       pagination: {
         page,
         limit,

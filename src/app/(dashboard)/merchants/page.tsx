@@ -1,28 +1,54 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Loader2, Store } from "lucide-react";
-import { formatCurrency } from "@/lib/utils";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Loader2, Store, ChevronLeft, ChevronRight } from "lucide-react";
+import { cn, formatCurrency } from "@/lib/utils";
+import Link from "next/link";
 
 export default function MerchantsPage() {
+  const queryClient = useQueryClient();
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
 
   const params = useMemo(() => {
     const p = new URLSearchParams();
     if (dateFrom) p.set("dateFrom", dateFrom);
     if (dateTo) p.set("dateTo", dateTo);
+    if (search.trim()) p.set("search", search.trim());
+    p.set("page", String(page));
     p.set("limit", String(limit));
     return p.toString();
-  }, [dateFrom, dateTo, limit]);
+  }, [dateFrom, dateTo, search, page, limit]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["merchant-analytics", dateFrom, dateTo, limit],
+    queryKey: ["merchant-analytics", dateFrom, dateTo, search, page, limit],
     queryFn: async () => {
       const res = await fetch(`/api/analytics/merchants?${params}`);
       return res.json();
+    },
+  });
+  const updateMerchant = useMutation({
+    mutationFn: async (payload: {
+      merchantName: string;
+      displayName?: string;
+      avatarUrl?: string;
+      notes?: string;
+    }) => {
+      const res = await fetch("/api/recurring/rules", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["merchant-analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-rules"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
     },
   });
 
@@ -48,7 +74,10 @@ export default function MerchantsPage() {
             <input
               type="date"
               value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setPage(1);
+              }}
               className="h-9 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-gray-700 dark:text-gray-300"
             />
           </div>
@@ -59,8 +88,26 @@ export default function MerchantsPage() {
             <input
               type="date"
               value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                setPage(1);
+              }}
               className="h-9 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-gray-700 dark:text-gray-300"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+              Recherche
+            </label>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Nom ou catégorie dominante..."
+              className="h-9 min-w-[240px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-gray-700 dark:text-gray-300"
             />
           </div>
           <div>
@@ -69,7 +116,10 @@ export default function MerchantsPage() {
             </label>
             <select
               value={limit}
-              onChange={(e) => setLimit(Number(e.target.value))}
+              onChange={(e) => {
+                setLimit(Number(e.target.value));
+                setPage(1);
+              }}
               className="h-9 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-gray-700 dark:text-gray-300"
             >
               <option value={10}>Top 10</option>
@@ -127,23 +177,51 @@ export default function MerchantsPage() {
                   <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">
                     Dépenses totales
                   </th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">
+                    Profil marchand
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {data.merchants.map(
                   (merchant: {
                     merchantName: string;
+                    merchantPattern: string;
+                    displayName: string;
+                    avatarUrl?: string | null;
+                    notes?: string | null;
                     topCategory: string;
                     transactionCount: number;
                     averageAmount: number;
                     totalSpent: number;
                   }) => (
                     <tr
-                      key={merchant.merchantName}
+                      key={merchant.merchantPattern}
                       className="border-b border-gray-100 dark:border-gray-800"
                     >
-                      <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
-                        {merchant.merchantName}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          {merchant.avatarUrl ? (
+                            <img
+                              src={merchant.avatarUrl}
+                              alt={merchant.displayName}
+                              className="h-8 w-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900" />
+                          )}
+                          <div className="min-w-0">
+                            <Link
+                              href={`/merchants/${encodeURIComponent(merchant.merchantPattern)}`}
+                              className="font-medium text-gray-900 dark:text-white hover:text-indigo-600"
+                            >
+                              {merchant.displayName}
+                            </Link>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                              {merchant.merchantName}
+                            </p>
+                          </div>
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-gray-600 dark:text-gray-400">
                         {merchant.topCategory}
@@ -157,12 +235,85 @@ export default function MerchantsPage() {
                       <td className="px-4 py-3 text-right font-semibold text-red-600 dark:text-red-400">
                         {formatCurrency(merchant.totalSpent)}
                       </td>
+                      <td className="px-4 py-3">
+                        <input
+                          defaultValue={merchant.displayName}
+                          onBlur={(e) =>
+                            updateMerchant.mutate({
+                              merchantName: merchant.merchantName,
+                              displayName: e.target.value,
+                            })
+                          }
+                          className="h-8 w-32 rounded border border-gray-200 dark:border-gray-700 bg-transparent px-2 text-xs"
+                          placeholder="Alias"
+                        />
+                        <input
+                          defaultValue={merchant.avatarUrl || ""}
+                          onBlur={(e) =>
+                            updateMerchant.mutate({
+                              merchantName: merchant.merchantName,
+                              avatarUrl: e.target.value,
+                            })
+                          }
+                          className="mt-1 h-8 w-40 rounded border border-gray-200 dark:border-gray-700 bg-transparent px-2 text-xs"
+                          placeholder="URL image"
+                        />
+                        <input
+                          defaultValue={merchant.notes || ""}
+                          onBlur={(e) =>
+                            updateMerchant.mutate({
+                              merchantName: merchant.merchantName,
+                              notes: e.target.value,
+                            })
+                          }
+                          className="mt-1 h-8 w-40 rounded border border-gray-200 dark:border-gray-700 bg-transparent px-2 text-xs"
+                          placeholder="Note"
+                        />
+                      </td>
                     </tr>
                   )
                 )}
               </tbody>
             </table>
           </div>
+          {data?.pagination?.totalPages > 1 && (
+            <div className="mt-4 flex items-center justify-between">
+              <p className="text-sm text-gray-500 dark:text-gray-400">
+                {data.pagination.total} marchand{data.pagination.total > 1 ? "s" : ""}
+              </p>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={data.pagination.page <= 1}
+                  className={cn(
+                    "p-1.5 rounded-md transition-colors",
+                    data.pagination.page <= 1
+                      ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                      : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  )}
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                <span className="px-2 text-sm text-gray-600 dark:text-gray-300">
+                  {data.pagination.page} / {data.pagination.totalPages}
+                </span>
+                <button
+                  onClick={() =>
+                    setPage((p) => Math.min(data.pagination.totalPages, p + 1))
+                  }
+                  disabled={data.pagination.page >= data.pagination.totalPages}
+                  className={cn(
+                    "p-1.5 rounded-md transition-colors",
+                    data.pagination.page >= data.pagination.totalPages
+                      ? "text-gray-300 dark:text-gray-600 cursor-not-allowed"
+                      : "text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                  )}
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

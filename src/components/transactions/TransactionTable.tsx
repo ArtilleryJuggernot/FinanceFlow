@@ -19,10 +19,12 @@ interface Transaction {
   date: string | Date;
   description: string;
   merchantName?: string | null;
+  merchantProfile?: { displayName?: string | null; avatarUrl?: string | null; notes?: string | null } | null;
   amount: number;
   currency: string;
   category: { id: string; name: string; icon: string | null; color: string | null } | null;
   account: { name: string };
+  notes?: string | null;
 }
 
 interface Pagination {
@@ -35,6 +37,7 @@ interface TransactionTableProps {
   transactions: Transaction[];
   categories: Category[];
   onUpdateCategory: (transactionId: string, categoryId: string) => void;
+  onUpdateNotes?: (transactionId: string, notes: string) => void;
   pagination: Pagination;
   onPageChange?: (page: number) => void;
 }
@@ -43,6 +46,7 @@ export function TransactionTable({
   transactions,
   categories,
   onUpdateCategory,
+  onUpdateNotes,
   pagination,
   onPageChange,
 }: TransactionTableProps) {
@@ -163,11 +167,17 @@ export function TransactionTable({
                       <span className="font-medium text-gray-900 dark:text-white">
                         {tx.description}
                       </span>
-                      {tx.merchantName && (
+                      {(tx.merchantProfile?.displayName || tx.merchantName) && (
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          {tx.merchantName}
+                          {tx.merchantProfile?.displayName || tx.merchantName}
                         </p>
                       )}
+                      <input
+                        defaultValue={tx.notes || ""}
+                        onBlur={(e) => onUpdateNotes?.(tx.id, e.target.value)}
+                        placeholder="Ajouter une note..."
+                        className="mt-1 w-full max-w-xs rounded border border-gray-200 dark:border-gray-700 bg-transparent px-2 py-1 text-xs text-gray-500 dark:text-gray-400"
+                      />
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">

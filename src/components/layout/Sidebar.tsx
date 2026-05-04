@@ -11,6 +11,7 @@ import {
   Repeat,
   Building2,
   Settings,
+  Bot,
   Landmark,
   ChevronLeft,
   ChevronRight,
@@ -26,6 +27,7 @@ const navItems = [
   { href: "/goals", label: "Objectifs", icon: PiggyBank },
   { href: "/accounts", label: "Comptes", icon: Building2 },
   { href: "/settings/categories", label: "Catégories", icon: Settings },
+  { href: "/ai", label: "Intelligence IA", icon: Bot },
   { href: "/settings", label: "Paramètres", icon: Settings },
 ];
 

@@ -14,11 +14,16 @@ type CategoryNode = {
   children?: CategoryNode[];
 };
 
+const ICON_CATALOG = [
+  "🏠", "🛒", "🍽️", "🚗", "⛽", "🚌", "🎮", "🏋️", "💊", "🛍️",
+  "💻", "📱", "📶", "💳", "💰", "📈", "🏦", "🎁", "📚", "🧾",
+];
+
 export default function SettingsCategoriesPage() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
     name: "",
-    icon: "tag",
+    icon: "🏷️",
     color: "#6366f1",
     type: "expense" as "income" | "expense",
     parentId: "",
@@ -165,6 +170,20 @@ export default function SettingsCategoriesPage() {
             ))}
           </select>
         </div>
+        <div className="mt-3">
+          <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">Catalogue d'icônes</p>
+          <div className="flex flex-wrap gap-2">
+            {ICON_CATALOG.map((icon) => (
+              <button
+                key={icon}
+                onClick={() => setForm((prev) => ({ ...prev, icon }))}
+                className="h-8 w-8 rounded border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {icon}
+              </button>
+            ))}
+          </div>
+        </div>
         <button
           onClick={() => createCategory.mutate()}
           disabled={!form.name || createCategory.isPending}
@@ -173,6 +192,30 @@ export default function SettingsCategoriesPage() {
           {createCategory.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
           Ajouter
         </button>
+      </div>
+
+      <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-4">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Vue hiérarchique</h2>
+        <div className="space-y-3">
+          {(categories || []).map((parent: CategoryNode) => (
+            <div key={parent.id} className="rounded-lg border border-gray-200 dark:border-gray-700 p-3">
+              <div className="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
+                <span>{parent.icon}</span>
+                <span>{parent.name}</span>
+              </div>
+              {!!parent.children?.length && (
+                <div className="mt-2 ml-5 space-y-1 border-l border-gray-200 dark:border-gray-700 pl-3">
+                  {parent.children.map((child) => (
+                    <div key={child.id} className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                      <span>{child.icon}</span>
+                      <span>{child.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 overflow-hidden">
@@ -235,6 +278,22 @@ export default function SettingsCategoriesPage() {
                       }
                       className="h-9 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 px-2"
                     />
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      {ICON_CATALOG.slice(0, 10).map((icon) => (
+                        <button
+                          key={`${cat.id}-${icon}`}
+                          onClick={() =>
+                            setEdits((prev) => ({
+                              ...prev,
+                              [cat.id]: { ...getEditState(cat), icon },
+                            }))
+                          }
+                          className="h-6 w-6 rounded border border-gray-200 dark:border-gray-700 text-xs"
+                        >
+                          {icon}
+                        </button>
+                      ))}
+                    </div>
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">

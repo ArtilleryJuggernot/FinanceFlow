@@ -2,21 +2,15 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
-
-function normalizeMerchantName(raw: string): string {
-  return raw
-    .toLowerCase()
-    .replace(/\b\d{1,2}[/-]\d{1,2}([/-]\d{2,4})?\b/g, " ")
-    .replace(/\b\d{4,}\b/g, " ")
-    .replace(/\b(v\d+|x\d+)\b/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
+import { normalizeMerchantName } from "@/lib/merchant";
 
 const updateRuleSchema = z.object({
   merchantName: z.string().min(1),
   excludeFromRecurring: z.boolean().optional(),
   categoryIds: z.array(z.string()).optional(),
+  displayName: z.string().optional(),
+  notes: z.string().optional(),
+  avatarUrl: z.string().optional(),
 });
 
 export async function GET() {
@@ -67,12 +61,18 @@ export async function PATCH(request: Request) {
           excludeFromRecurring: payload.excludeFromRecurring,
         }),
         ...(payload.categoryIds !== undefined && { categoryIds: payload.categoryIds }),
+        ...(payload.displayName !== undefined && { displayName: payload.displayName }),
+        ...(payload.notes !== undefined && { notes: payload.notes }),
+        ...(payload.avatarUrl !== undefined && { avatarUrl: payload.avatarUrl }),
       },
       create: {
         userId: session.user.id,
         merchantPattern,
         excludeFromRecurring: payload.excludeFromRecurring ?? false,
         categoryIds: payload.categoryIds ?? [],
+        displayName: payload.displayName,
+        notes: payload.notes,
+        avatarUrl: payload.avatarUrl,
       },
     });
 
