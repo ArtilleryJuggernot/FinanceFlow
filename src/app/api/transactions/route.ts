@@ -100,7 +100,7 @@ export async function PATCH(request: Request) {
     }
 
     const body = await request.json();
-    const { id, categoryId, notes } = body;
+    const { id, categoryId, notes, photoUrl } = body;
 
     const transaction = await prisma.transaction.findFirst({
       where: { id, account: { userId: session.user.id } },
@@ -115,6 +115,7 @@ export async function PATCH(request: Request) {
       data: {
         ...(categoryId !== undefined && { categoryId }),
         ...(notes !== undefined && { notes }),
+        ...(photoUrl !== undefined && { photoUrl }),
       },
       include: { category: true },
     });

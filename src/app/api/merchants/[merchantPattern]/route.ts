@@ -3,6 +3,16 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { normalizeMerchantName } from "@/lib/merchant";
 
+type PrismaWithMerchantRule = typeof prisma & {
+  merchantRule: {
+    findFirst: (...args: unknown[]) => Promise<{
+      merchantPattern?: string | null;
+      publicId?: string | null;
+      [key: string]: unknown;
+    } | null>;
+  };
+};
+
 export async function GET(
   _request: Request,
   { params }: { params: Promise<{ merchantPattern: string }> }
@@ -15,17 +25,31 @@ export async function GET(
 
     const { merchantPattern } = await params;
     const decoded = decodeURIComponent(merchantPattern);
-    const ruleById = await prisma.merchantRule.findFirst({
+    const prismaClient = prisma as PrismaWithMerchantRule;
+    const ruleById = await prismaClient.merchantRule.findFirst({
       where: { userId: session.user.id, publicId: decoded },
     });
     const effectivePattern = ruleById?.merchantPattern || decoded;
     const rule =
       ruleById ||
-      (await prisma.merchantRule.findFirst({
+      (await prismaClient.merchantRule.findFirst({
         where: { userId: session.user.id, merchantPattern: effectivePattern },
       }));
 
-    const txs = await prisma.transaction.findMany({
+    const txs = await (prisma.transaction as unknown as {
+      findMany: (args: unknown) => Promise<
+        Array<{
+          id: string;
+          date: Date;
+          amount: number;
+          description: string;
+          merchantName: string | null;
+          notes: string | null;
+          photoUrl?: string | null;
+          category: { name: string } | null;
+        }>
+      >;
+    }).findMany({
       where: {
         account: { userId: session.user.id },
         merchantName: { not: null },
@@ -36,6 +60,8 @@ export async function GET(
         amount: true,
         description: true,
         merchantName: true,
+        notes: true,
+        photoUrl: true,
         category: { select: { name: true } },
       },
       orderBy: { date: "desc" },

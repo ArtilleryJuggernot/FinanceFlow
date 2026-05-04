@@ -22,6 +22,8 @@ export default function MerchantDetailPage() {
   const [notesDraft, setNotesDraft] = useState("");
   const [displayNameDraft, setDisplayNameDraft] = useState("");
   const [avatarUrlDraft, setAvatarUrlDraft] = useState("");
+  const [avatarSearch, setAvatarSearch] = useState("");
+  const [avatarBroken, setAvatarBroken] = useState(false);
   const [uploading, setUploading] = useState(false);
 
   const { data, isLoading } = useQuery({
@@ -37,7 +39,22 @@ export default function MerchantDetailPage() {
     setNotesDraft(data.profile.notes || "");
     setDisplayNameDraft(data.profile.displayName || "");
     setAvatarUrlDraft(data.profile.avatarUrl || "");
+    setAvatarSearch("");
+    setAvatarBroken(false);
   }, [data?.profile]);
+
+  const { data: avatarLibrary } = useQuery({
+    queryKey: ["merchant-detail-avatar-library", avatarSearch, data?.merchantId],
+    enabled: !!data?.merchantId,
+    queryFn: async () => {
+      const p = new URLSearchParams({
+        search: avatarSearch.trim(),
+        limit: "20",
+      });
+      const res = await fetch(`/api/uploads/merchant-avatar?${p.toString()}`);
+      return res.json();
+    },
+  });
 
   const saveProfile = useMutation({
     mutationFn: async () => {
@@ -60,6 +77,34 @@ export default function MerchantDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
     },
   });
+  const saveTransactionNote = useMutation({
+    mutationFn: async ({ id, notes }: { id: string; notes: string }) => {
+      const res = await fetch("/api/transactions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, notes }),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["merchant-detail", merchantRef] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    },
+  });
+  const saveTransactionPhoto = useMutation({
+    mutationFn: async ({ id, photoUrl }: { id: string; photoUrl: string }) => {
+      const res = await fetch("/api/transactions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, photoUrl }),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["merchant-detail", merchantRef] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    },
+  });
 
   async function uploadFromDetail(file: File) {
     setUploading(true);
@@ -77,6 +122,7 @@ export default function MerchantDetailPage() {
 
     const url = uploadData.url as string;
     setAvatarUrlDraft(url);
+    setAvatarBroken(false);
     await fetch("/api/recurring/rules", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -89,6 +135,18 @@ export default function MerchantDetailPage() {
     queryClient.invalidateQueries({ queryKey: ["merchant-detail", merchantRef] });
     queryClient.invalidateQueries({ queryKey: ["merchant-analytics"] });
     setUploading(false);
+  }
+
+  async function uploadTransactionPhoto(id: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+    const uploadRes = await fetch("/api/uploads/transaction-photo", {
+      method: "POST",
+      body: formData,
+    });
+    const uploadData = await uploadRes.json();
+    if (!uploadRes.ok) return;
+    saveTransactionPhoto.mutate({ id, photoUrl: uploadData.url });
   }
 
   if (isLoading) {
@@ -113,27 +171,44 @@ export default function MerchantDetailPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          {displayNameDraft || data?.profile?.displayName || data?.merchantPattern || merchantRef}
-        </h1>
-        <p className="text-gray-500 dark:text-gray-400">{data?.merchantPattern || merchantRef}</p>
+        <div className="flex items-center gap-3">
+          {avatarUrlDraft && !avatarBroken ? (
+            <img
+              src={avatarUrlDraft}
+              alt={displayNameDraft || merchantRef}
+              className="h-14 w-14 rounded-full object-cover"
+              onError={() => setAvatarBroken(true)}
+            />
+          ) : (
+            <div className="h-14 w-14 rounded-full bg-gray-100 dark:bg-gray-800" />
+          )}
+          <div className="min-w-0">
+            <input
+              value={displayNameDraft}
+              onChange={(e) => setDisplayNameDraft(e.target.value)}
+              className="h-10 w-full max-w-xl rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-2xl font-bold text-gray-900 dark:text-white"
+            />
+            <p className="text-gray-500 dark:text-gray-400">{data?.merchantPattern || merchantRef}</p>
+          </div>
+        </div>
       </div>
 
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">Profil marchand</h2>
-        <div className="grid grid-cols-1 md:grid-cols-[auto,1fr] gap-4">
-          <div className="flex flex-col items-center gap-2">
-            {avatarUrlDraft ? (
-              <img
-                src={avatarUrlDraft}
-                alt={displayNameDraft || merchantRef}
-                className="h-20 w-20 rounded-full object-cover"
-              />
-            ) : (
-              <div className="h-20 w-20 rounded-full bg-gray-100 dark:bg-gray-800" />
-            )}
-            <label className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-gray-200 dark:border-gray-700 px-3 text-xs">
-              {uploading ? "Upload..." : "Uploader"}
+        <div className="space-y-3">
+          <div>
+            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">URL / PATH image</label>
+            <input
+              value={avatarUrlDraft}
+              onChange={(e) => setAvatarUrlDraft(e.target.value)}
+              placeholder="/uploads/merchants/... ou URL complète"
+              className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm"
+            />
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-gray-200 dark:border-gray-700 px-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
+              {uploading ? "Upload..." : "Uploader une image"}
               <input
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/gif"
@@ -146,20 +221,60 @@ export default function MerchantDetailPage() {
                 }}
               />
             </label>
+            <span className="text-xs text-gray-500 dark:text-gray-400">
+              (Tu peux aussi choisir une image déjà uploadée ci-dessous)
+            </span>
           </div>
-          <div className="space-y-2">
+
+          <div>
+            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+              Réutiliser une image existante
+            </label>
             <input
-              value={displayNameDraft}
-              onChange={(e) => setDisplayNameDraft(e.target.value)}
-              placeholder="Alias du marchand"
+              value={avatarSearch}
+              onChange={(e) => setAvatarSearch(e.target.value)}
+              placeholder="Filtrer par nom de fichier upload..."
               className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm"
             />
-            <input
-              value={avatarUrlDraft}
-              onChange={(e) => setAvatarUrlDraft(e.target.value)}
-              placeholder="URL image"
-              className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm"
-            />
+            <div className="mt-2 max-h-40 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
+              {(avatarLibrary || []).length === 0 ? (
+                <p className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
+                  Aucune image trouvée.
+                </p>
+              ) : (
+                (avatarLibrary || []).map(
+                  (item: { filename: string; url: string; updatedAt: string }) => (
+                    <button
+                      key={item.filename}
+                      onClick={() => {
+                        setAvatarUrlDraft(item.url);
+                        setAvatarBroken(false);
+                      }}
+                      className="flex w-full items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      <img
+                        src={item.url}
+                        alt={item.filename}
+                        className="h-8 w-8 rounded object-cover"
+                        onError={(e) => {
+                          (e.currentTarget as HTMLImageElement).style.display = "none";
+                        }}
+                      />
+                      <div className="min-w-0">
+                        <p className="truncate text-xs text-gray-700 dark:text-gray-200">{item.filename}</p>
+                        <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                          {new Date(item.updatedAt).toLocaleString("fr-FR")}
+                        </p>
+                      </div>
+                    </button>
+                  )
+                )
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Notes</label>
             <textarea
               rows={3}
               value={notesDraft}
@@ -167,14 +282,15 @@ export default function MerchantDetailPage() {
               placeholder="Notes associées au marchand..."
               className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
             />
-            <div className="flex justify-end">
-              <button
-                onClick={() => saveProfile.mutate()}
-                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
-              >
-                Enregistrer profil
-              </button>
-            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              onClick={() => saveProfile.mutate()}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+            >
+              Enregistrer profil
+            </button>
           </div>
         </div>
       </div>
@@ -268,17 +384,59 @@ export default function MerchantDetailPage() {
               date: string;
               description: string;
               amount: number;
+              notes?: string | null;
               category: { name: string } | null;
+              photoUrl?: string | null;
             }) => (
               <div
                 key={tx.id}
                 className="flex items-center justify-between rounded-lg border border-gray-100 dark:border-gray-800 px-3 py-2"
               >
-                <div>
+                <div className="flex items-start gap-3">
+                  {tx.photoUrl ? (
+                    <img
+                      src={tx.photoUrl}
+                      alt="Photo transaction"
+                      className="h-12 w-12 rounded object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).style.display = "none";
+                      }}
+                    />
+                  ) : (
+                    <div className="h-12 w-12 rounded bg-gray-100 dark:bg-gray-800" />
+                  )}
+                  <div>
                   <p className="font-medium text-gray-900 dark:text-white">{tx.description}</p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
                     {formatDateShort(tx.date)} - {tx.category?.name || "Non catégorisé"}
                   </p>
+                  <label className="mt-1 inline-flex h-7 cursor-pointer items-center rounded border border-gray-200 dark:border-gray-700 px-2 text-[11px] text-gray-600 dark:text-gray-300">
+                    Ajouter / remplacer photo
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp,image/gif"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        uploadTransactionPhoto(tx.id, file);
+                        e.currentTarget.value = "";
+                      }}
+                    />
+                  </label>
+                  <textarea
+                    rows={2}
+                    defaultValue={tx.notes || ""}
+                    onBlur={(e) =>
+                      saveTransactionNote.mutate({
+                        id: tx.id,
+                        notes: e.target.value,
+                      })
+                    }
+                    placeholder="Note de transaction..."
+                    className="mt-1 w-full min-w-[280px] rounded border border-gray-200 dark:border-gray-700 bg-transparent px-2 py-1 text-xs text-gray-600 dark:text-gray-300"
+                  />
+                  </div>
                 </div>
                 <span className="font-semibold text-red-600 dark:text-red-400">
                   {formatCurrency(Math.abs(tx.amount))}

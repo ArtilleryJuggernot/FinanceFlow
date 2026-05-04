@@ -41,6 +41,7 @@ export default function MerchantsPage() {
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [uploadingMerchant, setUploadingMerchant] = useState<string | null>(null);
+  const [brokenAvatars, setBrokenAvatars] = useState<Record<string, boolean>>({});
   const [activeTab, setActiveTab] = useState<"table" | "quality">("table");
   const [sortKey, setSortKey] = useState<SortKey>("totalSpent");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
@@ -492,11 +493,17 @@ export default function MerchantsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
-                          {merchant.avatarUrl ? (
+                          {merchant.avatarUrl && !brokenAvatars[merchant.merchantPattern] ? (
                             <img
                               src={merchant.avatarUrl}
                               alt={merchant.displayName}
                               className="h-8 w-8 rounded-full object-cover"
+                              onError={() =>
+                                setBrokenAvatars((prev) => ({
+                                  ...prev,
+                                  [merchant.merchantPattern]: true,
+                                }))
+                              }
                             />
                           ) : (
                             <div className="h-8 w-8 rounded-full bg-indigo-100 dark:bg-indigo-900" />
@@ -714,6 +721,9 @@ export default function MerchantsPage() {
                             src={item.url}
                             alt={item.filename}
                             className="h-8 w-8 rounded object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).style.display = "none";
+                            }}
                           />
                           <div className="min-w-0">
                             <p className="truncate text-xs text-gray-700 dark:text-gray-200">

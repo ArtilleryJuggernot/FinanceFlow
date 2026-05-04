@@ -103,6 +103,45 @@ export default function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
     },
   });
+  const updatePhoto = useMutation({
+    mutationFn: async ({ txId, photoUrl }: { txId: string; photoUrl: string }) => {
+      const res = await fetch("/api/transactions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: txId, photoUrl }),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    },
+  });
+  const uploadTransactionPhoto = useMutation({
+    mutationFn: async ({ txId, file }: { txId: string; file: File }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+      const uploadRes = await fetch("/api/uploads/transaction-photo", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.error || "Erreur upload");
+
+      const patchRes = await fetch("/api/transactions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: txId, photoUrl: uploadData.url }),
+      });
+      if (!patchRes.ok) {
+        const patchData = await patchRes.json();
+        throw new Error(patchData.error || "Erreur mise à jour");
+      }
+      return uploadData;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    },
+  });
 
   const categorizeAll = useMutation({
     mutationFn: async () => {
@@ -254,6 +293,8 @@ export default function TransactionsPage() {
             updateCategory.mutate({ txId, categoryId })
           }
           onUpdateNotes={(txId, notes) => updateNotes.mutate({ txId, notes })}
+          onSetPhotoUrl={(txId, photoUrl) => updatePhoto.mutate({ txId, photoUrl })}
+          onUploadPhoto={(txId, file) => uploadTransactionPhoto.mutate({ txId, file })}
           pagination={{
             page: data?.pagination?.page || 1,
             totalPages: data?.pagination?.totalPages || 1,

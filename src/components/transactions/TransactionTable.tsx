@@ -25,6 +25,7 @@ interface Transaction {
   category: { id: string; name: string; icon: string | null; color: string | null } | null;
   account: { name: string };
   notes?: string | null;
+  photoUrl?: string | null;
 }
 
 interface Pagination {
@@ -38,6 +39,8 @@ interface TransactionTableProps {
   categories: Category[];
   onUpdateCategory: (transactionId: string, categoryId: string) => void;
   onUpdateNotes?: (transactionId: string, notes: string) => void;
+  onUploadPhoto?: (transactionId: string, file: File) => void;
+  onSetPhotoUrl?: (transactionId: string, photoUrl: string) => void;
   pagination: Pagination;
   onPageChange?: (page: number) => void;
 }
@@ -47,6 +50,8 @@ export function TransactionTable({
   categories,
   onUpdateCategory,
   onUpdateNotes,
+  onUploadPhoto,
+  onSetPhotoUrl,
   pagination,
   onPageChange,
 }: TransactionTableProps) {
@@ -178,6 +183,29 @@ export function TransactionTable({
                         placeholder="Ajouter une note..."
                         className="mt-1 w-full max-w-xs rounded border border-gray-200 dark:border-gray-700 bg-transparent px-2 py-1 text-xs text-gray-500 dark:text-gray-400"
                       />
+                      <div className="mt-1 flex items-center gap-2">
+                        <label className="inline-flex h-7 cursor-pointer items-center rounded border border-gray-200 dark:border-gray-700 px-2 text-[11px] text-gray-500 dark:text-gray-400">
+                          Ajouter photo
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/gif"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              onUploadPhoto?.(tx.id, file);
+                              e.currentTarget.value = "";
+                            }}
+                          />
+                        </label>
+                        {tx.photoUrl && (
+                          <img
+                            src={tx.photoUrl}
+                            alt="Photo transaction"
+                            className="h-7 w-7 rounded object-cover"
+                          />
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
