@@ -19,6 +19,15 @@ function normalizeDisplayImageUrl(url?: string | null): string {
   if (!url) return "";
   const cleaned = url.trim().replace(/\\/g, "/");
   if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) return cleaned;
+  if (cleaned.startsWith("/api/uploads/merchant-avatar/file/")) return cleaned;
+  if (cleaned.startsWith("/uploads/merchants/")) {
+    const filename = cleaned.split("/").pop();
+    return filename ? `/api/uploads/merchant-avatar/file/${filename}` : cleaned;
+  }
+  if (cleaned.startsWith("uploads/merchants/")) {
+    const filename = cleaned.split("/").pop();
+    return filename ? `/api/uploads/merchant-avatar/file/${filename}` : `/${cleaned}`;
+  }
   if (cleaned.startsWith("/")) return cleaned;
   return `/${cleaned}`;
 }
@@ -264,7 +273,7 @@ export default function MerchantDetailPage() {
                     >
                       <div className="h-8 w-14 overflow-hidden rounded bg-gray-50 p-0.5 dark:bg-gray-800">
                         <img
-                          src={item.url}
+                          src={normalizeDisplayImageUrl(item.url)}
                           alt={item.filename}
                           className="h-full w-full object-contain"
                           onError={(e) => {

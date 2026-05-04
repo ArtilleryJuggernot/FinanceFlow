@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { mkdir, readdir, stat, writeFile } from "fs/promises";
+import { mkdir, readdir, stat, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 
@@ -9,6 +9,10 @@ export const runtime = "nodejs";
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const ALLOWED_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
+
+function getUploadDir(): string {
+  return path.join(process.cwd(), "public", "uploads", "merchants");
+}
 
 function extensionFromType(type: string): string {
   if (type === "image/png") return "png";
@@ -42,7 +46,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Image trop lourde (max 5MB)" }, { status: 400 });
     }
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "merchants");
+    const uploadDir = getUploadDir();
     await mkdir(uploadDir, { recursive: true });
 
     const ext = extensionFromType(file.type);
@@ -52,7 +56,7 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(filePath, buffer);
 
-    const relativeUrl = `/uploads/merchants/${encodeURIComponent(filename)}`;
+    const relativeUrl = `/api/uploads/merchant-avatar/file/${encodeURIComponent(filename)}`;
     const origin = new URL(request.url).origin;
 
     return NextResponse.json({
@@ -77,7 +81,7 @@ export async function GET(request: Request) {
     const search = (searchParams.get("search") || "").trim().toLowerCase();
     const limit = Math.min(parseInt(searchParams.get("limit") || "30", 10), 100);
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "merchants");
+    const uploadDir = getUploadDir();
     await mkdir(uploadDir, { recursive: true });
 
     const files = await readdir(uploadDir);
@@ -93,7 +97,7 @@ export async function GET(request: Request) {
       filtered.map(async (filename) => {
         const filePath = path.join(uploadDir, filename);
         const info = await stat(filePath);
-        const url = `/uploads/merchants/${encodeURIComponent(filename)}`;
+        const url = `/api/uploads/merchant-avatar/file/${encodeURIComponent(filename)}`;
         return {
           filename,
           url,
@@ -107,6 +111,36 @@ export async function GET(request: Request) {
     return NextResponse.json(items);
   } catch (error) {
     console.error("Merchant avatar list error:", error);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
+export async function DELETE(request: Request) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const filenameParam = searchParams.get("filename");
+    if (!filenameParam) {
+      return NextResponse.json({ error: "filename requis" }, { status: 400 });
+    }
+
+    const filename = decodeURIComponent(filenameParam);
+    const normalized = path.basename(filename);
+    if (normalized !== filename) {
+      return NextResponse.json({ error: "filename invalide" }, { status: 400 });
+    }
+
+    const uploadDir = getUploadDir();
+    const filePath = path.join(uploadDir, normalized);
+    await unlink(filePath);
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("Merchant avatar delete error:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

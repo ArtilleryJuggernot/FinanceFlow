@@ -12,6 +12,7 @@ import {
   ArrowUp,
   Settings2,
   StickyNote,
+  X,
 } from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
@@ -36,6 +37,15 @@ function normalizeDisplayImageUrl(url?: string | null): string {
   if (!url) return "";
   const cleaned = url.trim().replace(/\\/g, "/");
   if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) return cleaned;
+  if (cleaned.startsWith("/api/uploads/merchant-avatar/file/")) return cleaned;
+  if (cleaned.startsWith("/uploads/merchants/")) {
+    const filename = cleaned.split("/").pop();
+    return filename ? `/api/uploads/merchant-avatar/file/${filename}` : cleaned;
+  }
+  if (cleaned.startsWith("uploads/merchants/")) {
+    const filename = cleaned.split("/").pop();
+    return filename ? `/api/uploads/merchant-avatar/file/${filename}` : `/${cleaned}`;
+  }
   if (cleaned.startsWith("/")) return cleaned;
   return `/${cleaned}`;
 }
@@ -175,6 +185,23 @@ export default function MerchantsPage() {
       });
       const res = await fetch(`/api/uploads/merchant-avatar?${p.toString()}`);
       return res.json();
+    },
+  });
+  const deleteMerchantAvatar = useMutation({
+    mutationFn: async (filename: string) => {
+      const p = new URLSearchParams({ filename });
+      const res = await fetch(`/api/uploads/merchant-avatar?${p.toString()}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Erreur suppression");
+      return filename;
+    },
+    onSuccess: (filename) => {
+      queryClient.invalidateQueries({ queryKey: ["merchant-avatar-library"] });
+      if (profileDraft.avatarUrl.includes(filename)) {
+        setProfileDraft((prev) => ({ ...prev, avatarUrl: "" }));
+      }
     },
   });
 
@@ -719,35 +746,46 @@ export default function MerchantsPage() {
                   ) : (
                     (avatarLibrary || []).map(
                       (item: { filename: string; url: string; updatedAt: string }) => (
-                        <button
+                        <div
                           key={item.filename}
-                          onClick={() =>
-                            setProfileDraft((prev) => ({
-                              ...prev,
-                              avatarUrl: item.url,
-                            }))
-                          }
-                          className="flex w-full items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                          className="flex items-center gap-2 border-b border-gray-100 px-3 py-2 dark:border-gray-800"
                         >
-                          <div className="h-8 w-14 overflow-hidden rounded bg-gray-50 p-0.5 dark:bg-gray-800">
-                            <img
-                              src={item.url}
-                              alt={item.filename}
-                              className="h-full w-full object-contain"
-                              onError={(e) => {
-                                (e.currentTarget as HTMLImageElement).style.display = "none";
-                              }}
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-xs text-gray-700 dark:text-gray-200">
-                              {item.filename}
-                            </p>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400">
-                              {new Date(item.updatedAt).toLocaleString("fr-FR")}
-                            </p>
-                          </div>
-                        </button>
+                          <button
+                            onClick={() =>
+                              setProfileDraft((prev) => ({
+                                ...prev,
+                                avatarUrl: item.url,
+                              }))
+                            }
+                            className="flex min-w-0 flex-1 items-center gap-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                          >
+                            <div className="h-8 w-14 overflow-hidden rounded bg-gray-50 p-0.5 dark:bg-gray-800">
+                              <img
+                                src={item.url}
+                                alt={item.filename}
+                                className="h-full w-full object-contain"
+                                onError={(e) => {
+                                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                                }}
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-xs text-gray-700 dark:text-gray-200">
+                                {item.filename}
+                              </p>
+                              <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                                {new Date(item.updatedAt).toLocaleString("fr-FR")}
+                              </p>
+                            </div>
+                          </button>
+                          <button
+                            title="Supprimer ce logo"
+                            onClick={() => deleteMerchantAvatar.mutate(item.filename)}
+                            className="rounded p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       )
                     )
                   )}
