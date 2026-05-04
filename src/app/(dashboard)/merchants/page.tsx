@@ -13,6 +13,7 @@ export default function MerchantsPage() {
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
+  const [uploadingMerchant, setUploadingMerchant] = useState<string | null>(null);
 
   const params = useMemo(() => {
     const p = new URLSearchParams();
@@ -49,6 +50,43 @@ export default function MerchantsPage() {
       queryClient.invalidateQueries({ queryKey: ["merchant-analytics"] });
       queryClient.invalidateQueries({ queryKey: ["recurring-rules"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    },
+  });
+  const uploadMerchantAvatar = useMutation({
+    mutationFn: async ({ merchantName, file }: { merchantName: string; file: File }) => {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadRes = await fetch("/api/uploads/merchant-avatar", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploadData.error || "Erreur upload");
+
+      const patchRes = await fetch("/api/recurring/rules", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          merchantName,
+          avatarUrl: uploadData.url,
+        }),
+      });
+      if (!patchRes.ok) {
+        const patchData = await patchRes.json();
+        throw new Error(patchData.error || "Erreur assignation avatar");
+      }
+
+      return uploadData;
+    },
+    onSuccess: () => {
+      setUploadingMerchant(null);
+      queryClient.invalidateQueries({ queryKey: ["merchant-analytics"] });
+      queryClient.invalidateQueries({ queryKey: ["recurring-rules"] });
+      queryClient.invalidateQueries({ queryKey: ["transactions"] });
+    },
+    onError: () => {
+      setUploadingMerchant(null);
     },
   });
 
@@ -258,6 +296,26 @@ export default function MerchantsPage() {
                           className="mt-1 h-8 w-40 rounded border border-gray-200 dark:border-gray-700 bg-transparent px-2 text-xs"
                           placeholder="URL image"
                         />
+                        <label className="mt-1 inline-flex h-8 cursor-pointer items-center rounded border border-gray-200 dark:border-gray-700 px-2 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
+                          {uploadingMerchant === merchant.merchantPattern
+                            ? "Upload..."
+                            : "Uploader image"}
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/webp,image/gif"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              setUploadingMerchant(merchant.merchantPattern);
+                              uploadMerchantAvatar.mutate({
+                                merchantName: merchant.merchantName,
+                                file,
+                              });
+                              e.currentTarget.value = "";
+                            }}
+                          />
+                        </label>
                         <input
                           defaultValue={merchant.notes || ""}
                           onBlur={(e) =>
