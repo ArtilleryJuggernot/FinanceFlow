@@ -14,6 +14,9 @@ export async function GET(request: Request) {
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
     const search = (searchParams.get("search") || "").trim().toLowerCase();
+    const category = (searchParams.get("category") || "").trim().toLowerCase();
+    const sortBy = (searchParams.get("sortBy") || "totalSpent").trim();
+    const sortDir = (searchParams.get("sortDir") || "desc").trim().toLowerCase();
     const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);
     const limit = Math.min(parseInt(searchParams.get("limit") || "20", 10), 100);
 
@@ -57,6 +60,7 @@ export async function GET(request: Request) {
         averageAmount: number;
         topCategory: string;
         trendByMonth: Record<string, number>;
+        categorySpend: Record<string, number>;
       }
     >();
 
@@ -76,6 +80,7 @@ export async function GET(request: Request) {
           averageAmount: 0,
           topCategory: "Non catégorisé",
           trendByMonth: {},
+          categorySpend: {},
         });
       }
 
@@ -86,26 +91,53 @@ export async function GET(request: Request) {
       const monthKey = tx.date.toISOString().slice(0, 7);
       item.trendByMonth[monthKey] = (item.trendByMonth[monthKey] || 0) + Math.abs(tx.amount);
 
-      if (tx.category?.name) {
-        item.topCategory = tx.category.name;
-      }
+      const categoryName = tx.category?.name || "Non catégorisé";
+      item.categorySpend[categoryName] = (item.categorySpend[categoryName] || 0) + Math.abs(tx.amount);
     }
 
-    const sortedMerchants = Array.from(grouped.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+    const computedMerchants = Array.from(grouped.values()).map((m) => {
+      const topEntry =
+        Object.entries(m.categorySpend).sort((a, b) => b[1] - a[1])[0] || ["Non catégorisé", 0];
+      return {
+        ...m,
+        topCategory: topEntry[0],
+      };
+    });
 
     const filteredMerchants = search
-      ? sortedMerchants.filter((m) => {
+      ? computedMerchants.filter((m) => {
           const haystack = `${m.displayName} ${m.merchantName} ${m.topCategory}`.toLowerCase();
           return haystack.includes(search);
         })
-      : sortedMerchants;
+      : computedMerchants;
 
-    const total = filteredMerchants.length;
+    const categoryFilteredMerchants = category
+      ? filteredMerchants.filter((m) => m.topCategory.toLowerCase() === category)
+      : filteredMerchants;
+
+    const sortedMerchants = [...categoryFilteredMerchants].sort((a, b) => {
+      const direction = sortDir === "asc" ? 1 : -1;
+      if (sortBy === "displayName") {
+        return a.displayName.localeCompare(b.displayName) * direction;
+      }
+      if (sortBy === "topCategory") {
+        return a.topCategory.localeCompare(b.topCategory) * direction;
+      }
+      if (sortBy === "transactionCount") {
+        return (a.transactionCount - b.transactionCount) * direction;
+      }
+      if (sortBy === "averageAmount") {
+        return (a.averageAmount - b.averageAmount) * direction;
+      }
+      return (a.totalSpent - b.totalSpent) * direction;
+    });
+
+    const total = sortedMerchants.length;
     const totalPages = Math.max(Math.ceil(total / limit), 1);
     const safePage = Math.min(page, totalPages);
     const start = (safePage - 1) * limit;
 
-    const merchants = filteredMerchants
+    const merchants = sortedMerchants
       .slice(start, start + limit)
       .map((m) => ({
         ...m,

@@ -2,31 +2,81 @@
 
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Loader2, Store, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Loader2,
+  Store,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  ArrowDown,
+  ArrowUp,
+  Settings2,
+  StickyNote,
+} from "lucide-react";
 import { cn, formatCurrency } from "@/lib/utils";
 import Link from "next/link";
+
+type SortDirection = "asc" | "desc" | "normal";
+type SortKey = "displayName" | "topCategory" | "transactionCount" | "averageAmount" | "totalSpent";
+
+type MerchantItem = {
+  merchantName: string;
+  merchantPattern: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  notes?: string | null;
+  topCategory: string;
+  transactionCount: number;
+  averageAmount: number;
+  totalSpent: number;
+};
 
 export default function MerchantsPage() {
   const queryClient = useQueryClient();
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
   const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [page, setPage] = useState(1);
   const [limit, setLimit] = useState(20);
   const [uploadingMerchant, setUploadingMerchant] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"table" | "quality">("table");
+  const [sortKey, setSortKey] = useState<SortKey>("totalSpent");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [editingMerchant, setEditingMerchant] = useState<MerchantItem | null>(null);
+  const [profileDraft, setProfileDraft] = useState({
+    displayName: "",
+    avatarUrl: "",
+    notes: "",
+  });
 
   const params = useMemo(() => {
     const p = new URLSearchParams();
     if (dateFrom) p.set("dateFrom", dateFrom);
     if (dateTo) p.set("dateTo", dateTo);
     if (search.trim()) p.set("search", search.trim());
+    if (categoryFilter) p.set("category", categoryFilter);
+    if (sortDirection !== "normal") {
+      p.set("sortBy", sortKey);
+      p.set("sortDir", sortDirection);
+    }
     p.set("page", String(page));
     p.set("limit", String(limit));
     return p.toString();
-  }, [dateFrom, dateTo, search, page, limit]);
+  }, [dateFrom, dateTo, search, categoryFilter, sortKey, sortDirection, page, limit]);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["merchant-analytics", dateFrom, dateTo, search, page, limit],
+    queryKey: [
+      "merchant-analytics",
+      dateFrom,
+      dateTo,
+      search,
+      categoryFilter,
+      sortKey,
+      sortDirection,
+      page,
+      limit,
+    ],
     queryFn: async () => {
       const res = await fetch(`/api/analytics/merchants?${params}`);
       return res.json();
@@ -50,6 +100,7 @@ export default function MerchantsPage() {
       queryClient.invalidateQueries({ queryKey: ["merchant-analytics"] });
       queryClient.invalidateQueries({ queryKey: ["recurring-rules"] });
       queryClient.invalidateQueries({ queryKey: ["transactions"] });
+      setEditingMerchant(null);
     },
   });
   const uploadMerchantAvatar = useMutation({
@@ -90,6 +141,50 @@ export default function MerchantsPage() {
     },
   });
 
+  const merchants: MerchantItem[] = data?.merchants || [];
+  const categories = Array.from(new Set(merchants.map((m) => m.topCategory))).sort((a, b) =>
+    a.localeCompare(b)
+  );
+  const qualityRows = merchants.filter(
+    (m) =>
+      m.topCategory === "Non catégorisé" ||
+      !m.avatarUrl ||
+      !m.notes ||
+      !m.displayName ||
+      m.displayName.trim().toLowerCase() === m.merchantName.trim().toLowerCase()
+  );
+
+  const rowStart = ((data?.pagination?.page || 1) - 1) * (data?.pagination?.limit || limit);
+
+  function cycleSort(nextKey: SortKey) {
+    if (sortKey !== nextKey) {
+      setSortKey(nextKey);
+      setSortDirection("asc");
+      setPage(1);
+      return;
+    }
+    setSortDirection((prev) => {
+      const next = prev === "normal" ? "asc" : prev === "asc" ? "desc" : "normal";
+      return next;
+    });
+    setPage(1);
+  }
+
+  function sortIconFor(key: SortKey) {
+    if (sortKey !== key || sortDirection === "normal") return <ArrowUpDown className="h-3.5 w-3.5" />;
+    if (sortDirection === "asc") return <ArrowUp className="h-3.5 w-3.5" />;
+    return <ArrowDown className="h-3.5 w-3.5" />;
+  }
+
+  function openProfileModal(merchant: MerchantItem) {
+    setEditingMerchant(merchant);
+    setProfileDraft({
+      displayName: merchant.displayName || "",
+      avatarUrl: merchant.avatarUrl || "",
+      notes: merchant.notes || "",
+    });
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -97,9 +192,31 @@ export default function MerchantsPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
             Dépenses par marchand
           </h1>
-          <p className="text-gray-500 dark:text-gray-400">
-            Classement des marchands les plus dépensiers
-          </p>
+          <p className="text-gray-500 dark:text-gray-400">Classement et gestion avancée des marchands</p>
+        </div>
+        <div className="inline-flex rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-1">
+          <button
+            onClick={() => setActiveTab("table")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm",
+              activeTab === "table"
+                ? "bg-indigo-600 text-white"
+                : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            )}
+          >
+            Tableau marchands
+          </button>
+          <button
+            onClick={() => setActiveTab("quality")}
+            className={cn(
+              "rounded-md px-3 py-1.5 text-sm",
+              activeTab === "quality"
+                ? "bg-indigo-600 text-white"
+                : "text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            )}
+          >
+            Contrôle qualité
+          </button>
         </div>
       </div>
 
@@ -150,6 +267,26 @@ export default function MerchantsPage() {
           </div>
           <div>
             <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+              Filtre catégorie
+            </label>
+            <select
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                setPage(1);
+              }}
+              className="h-9 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm text-gray-700 dark:text-gray-300"
+            >
+              <option value="">Toutes les catégories</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
               Nombre de marchands
             </label>
             <select
@@ -172,12 +309,76 @@ export default function MerchantsPage() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
         </div>
-      ) : !data?.merchants?.length ? (
+      ) : !merchants.length ? (
         <div className="text-center py-20">
           <Store className="w-14 h-14 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
           <p className="text-gray-500 dark:text-gray-400">
             Aucune dépense marchand trouvée sur cette période.
           </p>
+        </div>
+      ) : activeTab === "quality" ? (
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-gray-800">
+                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Marchand</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Problèmes détectés</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {qualityRows.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="px-4 py-10 text-center text-gray-500 dark:text-gray-400">
+                    Aucun problème détecté. Les profils marchands sont complets.
+                  </td>
+                </tr>
+              ) : (
+                qualityRows.map((merchant) => {
+                  const issues: string[] = [];
+                  if (merchant.topCategory === "Non catégorisé") issues.push("Catégorie manquante");
+                  if (!merchant.avatarUrl) issues.push("Photo manquante");
+                  if (!merchant.notes) issues.push("Note manquante");
+                  if (
+                    !merchant.displayName ||
+                    merchant.displayName.trim().toLowerCase() === merchant.merchantName.trim().toLowerCase()
+                  ) {
+                    issues.push("Alias non personnalisé");
+                  }
+
+                  return (
+                    <tr key={merchant.merchantPattern} className="border-b border-gray-100 dark:border-gray-800">
+                      <td className="px-4 py-3">
+                        <p className="font-medium text-gray-900 dark:text-white">{merchant.displayName}</p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{merchant.merchantName}</p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-2">
+                          {issues.map((issue) => (
+                            <span
+                              key={issue}
+                              className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700"
+                            >
+                              {issue}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => openProfileModal(merchant)}
+                          className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-1.5 text-xs text-white hover:bg-indigo-700"
+                        >
+                          <Settings2 className="h-3.5 w-3.5" />
+                          Corriger
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       ) : (
         <>
@@ -200,43 +401,66 @@ export default function MerchantsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-200 dark:border-gray-800">
+                  <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">#</th>
                   <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">
-                    Marchand
-                  </th>
-                  <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">
-                    Catégorie dominante
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">
-                    Transactions
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">
-                    Panier moyen
-                  </th>
-                  <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">
-                    Dépenses totales
+                    <button
+                      onClick={() => cycleSort("displayName")}
+                      className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
+                    >
+                      Marchand
+                      {sortIconFor("displayName")}
+                    </button>
                   </th>
                   <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">
-                    Profil marchand
+                    <button
+                      onClick={() => cycleSort("topCategory")}
+                      className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
+                    >
+                      Catégorie dominante
+                      {sortIconFor("topCategory")}
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">
+                    <button
+                      onClick={() => cycleSort("transactionCount")}
+                      className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
+                    >
+                      Transactions
+                      {sortIconFor("transactionCount")}
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">
+                    <button
+                      onClick={() => cycleSort("averageAmount")}
+                      className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
+                    >
+                      Panier moyen
+                      {sortIconFor("averageAmount")}
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-right font-medium text-gray-500 dark:text-gray-400">
+                    <button
+                      onClick={() => cycleSort("totalSpent")}
+                      className="inline-flex items-center gap-1 hover:text-gray-700 dark:hover:text-gray-200"
+                    >
+                      Dépenses totales
+                      {sortIconFor("totalSpent")}
+                    </button>
+                  </th>
+                  <th className="px-4 py-3 text-left font-medium text-gray-500 dark:text-gray-400">
+                    Action
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {data.merchants.map(
-                  (merchant: {
-                    merchantName: string;
-                    merchantPattern: string;
-                    displayName: string;
-                    avatarUrl?: string | null;
-                    notes?: string | null;
-                    topCategory: string;
-                    transactionCount: number;
-                    averageAmount: number;
-                    totalSpent: number;
-                  }) => (
+                {merchants.map((merchant, idx) => (
                     <tr
                       key={merchant.merchantPattern}
                       className="border-b border-gray-100 dark:border-gray-800"
                     >
+                      <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        {rowStart + idx + 1}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3">
                           {merchant.avatarUrl ? (
@@ -274,63 +498,25 @@ export default function MerchantsPage() {
                         {formatCurrency(merchant.totalSpent)}
                       </td>
                       <td className="px-4 py-3">
-                        <input
-                          defaultValue={merchant.displayName}
-                          onBlur={(e) =>
-                            updateMerchant.mutate({
-                              merchantName: merchant.merchantName,
-                              displayName: e.target.value,
-                            })
-                          }
-                          className="h-8 w-32 rounded border border-gray-200 dark:border-gray-700 bg-transparent px-2 text-xs"
-                          placeholder="Alias"
-                        />
-                        <input
-                          defaultValue={merchant.avatarUrl || ""}
-                          onBlur={(e) =>
-                            updateMerchant.mutate({
-                              merchantName: merchant.merchantName,
-                              avatarUrl: e.target.value,
-                            })
-                          }
-                          className="mt-1 h-8 w-40 rounded border border-gray-200 dark:border-gray-700 bg-transparent px-2 text-xs"
-                          placeholder="URL image"
-                        />
-                        <label className="mt-1 inline-flex h-8 cursor-pointer items-center rounded border border-gray-200 dark:border-gray-700 px-2 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
-                          {uploadingMerchant === merchant.merchantPattern
-                            ? "Upload..."
-                            : "Uploader image"}
-                          <input
-                            type="file"
-                            accept="image/png,image/jpeg,image/webp,image/gif"
-                            className="hidden"
-                            onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (!file) return;
-                              setUploadingMerchant(merchant.merchantPattern);
-                              uploadMerchantAvatar.mutate({
-                                merchantName: merchant.merchantName,
-                                file,
-                              });
-                              e.currentTarget.value = "";
-                            }}
-                          />
-                        </label>
-                        <input
-                          defaultValue={merchant.notes || ""}
-                          onBlur={(e) =>
-                            updateMerchant.mutate({
-                              merchantName: merchant.merchantName,
-                              notes: e.target.value,
-                            })
-                          }
-                          className="mt-1 h-8 w-40 rounded border border-gray-200 dark:border-gray-700 bg-transparent px-2 text-xs"
-                          placeholder="Note"
-                        />
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => openProfileModal(merchant)}
+                            className="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700"
+                          >
+                            <Settings2 className="h-3.5 w-3.5" />
+                            Profil
+                          </button>
+                          <button
+                            onClick={() => openProfileModal(merchant)}
+                            className="inline-flex items-center gap-1 rounded-md border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                          >
+                            <StickyNote className="h-3.5 w-3.5" />
+                            Note
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  )
-                )}
+                  ))}
               </tbody>
             </table>
           </div>
@@ -373,6 +559,125 @@ export default function MerchantsPage() {
             </div>
           )}
         </>
+      )}
+
+      {editingMerchant && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 p-4"
+          onClick={() => setEditingMerchant(null)}
+        >
+          <div
+            className="mx-auto mt-16 max-w-xl rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+              Profil marchand
+            </h3>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {editingMerchant.merchantName}
+            </p>
+
+            <div className="mt-4 space-y-3">
+              <div>
+                <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Alias</label>
+                <input
+                  value={profileDraft.displayName}
+                  onChange={(e) =>
+                    setProfileDraft((prev) => ({ ...prev, displayName: e.target.value }))
+                  }
+                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                  URL image
+                </label>
+                <input
+                  value={profileDraft.avatarUrl}
+                  onChange={(e) =>
+                    setProfileDraft((prev) => ({ ...prev, avatarUrl: e.target.value }))
+                  }
+                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <label className="inline-flex h-9 cursor-pointer items-center rounded-lg border border-gray-200 dark:border-gray-700 px-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800">
+                  {uploadingMerchant === editingMerchant.merchantPattern
+                    ? "Upload en cours..."
+                    : "Uploader une image"}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setUploadingMerchant(editingMerchant.merchantPattern);
+                      uploadMerchantAvatar.mutate(
+                        {
+                          merchantName: editingMerchant.merchantName,
+                          file,
+                        },
+                        {
+                          onSuccess: (uploadData: { url: string }) => {
+                            setProfileDraft((prev) => ({ ...prev, avatarUrl: uploadData.url }));
+                          },
+                        }
+                      );
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                </label>
+                {profileDraft.avatarUrl ? (
+                  <img
+                    src={profileDraft.avatarUrl}
+                    alt={profileDraft.displayName || editingMerchant.merchantName}
+                    className="h-12 w-12 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-800" />
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">Note</label>
+                <textarea
+                  rows={4}
+                  value={profileDraft.notes}
+                  onChange={(e) =>
+                    setProfileDraft((prev) => ({ ...prev, notes: e.target.value }))
+                  }
+                  placeholder="Ajouter une note sur le marchand..."
+                  className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setEditingMerchant(null)}
+                className="rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-2 text-sm text-gray-600 dark:text-gray-300"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={() =>
+                  updateMerchant.mutate({
+                    merchantName: editingMerchant.merchantName,
+                    displayName: profileDraft.displayName,
+                    avatarUrl: profileDraft.avatarUrl,
+                    notes: profileDraft.notes,
+                  })
+                }
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+              >
+                Enregistrer
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
