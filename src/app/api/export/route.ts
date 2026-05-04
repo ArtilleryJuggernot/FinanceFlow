@@ -15,8 +15,11 @@ export async function GET(request: Request) {
     const formatType = searchParams.get("format") || "csv";
     const dateFrom = searchParams.get("dateFrom");
     const dateTo = searchParams.get("dateTo");
+    const fromStart = searchParams.get("fromStart") === "true";
     const accountId = searchParams.get("accountId");
     const categoryId = searchParams.get("categoryId");
+    const search = searchParams.get("search");
+    const type = searchParams.get("type");
 
     const where: Record<string, unknown> = {
       account: { userId: session.user.id },
@@ -24,11 +27,19 @@ export async function GET(request: Request) {
 
     if (accountId) where.accountId = accountId;
     if (categoryId) where.categoryId = categoryId;
-    if (dateFrom || dateTo) {
+    if (search) {
+      where.OR = [
+        { description: { contains: search } },
+        { merchantName: { contains: search } },
+      ];
+    }
+    if (!fromStart && (dateFrom || dateTo)) {
       where.date = {};
       if (dateFrom) (where.date as Record<string, unknown>).gte = new Date(dateFrom);
       if (dateTo) (where.date as Record<string, unknown>).lte = new Date(dateTo);
     }
+    if (type === "income") where.amount = { gt: 0 };
+    if (type === "expense") where.amount = { lt: 0 };
 
     const transactions = await prisma.transaction.findMany({
       where,

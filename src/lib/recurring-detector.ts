@@ -8,6 +8,23 @@ type TransactionGroup = {
   dates: Date[];
 };
 
+function normalizeMerchantName(raw: string): string {
+  return raw
+    .toLowerCase()
+    .replace(/\b\d{1,2}[/-]\d{1,2}([/-]\d{2,4})?\b/g, " ")
+    .replace(/\b\d{4,}\b/g, " ")
+    .replace(/\b(v\d+|x\d+)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function detectFrequency(avgIntervalDays: number): string {
+  if (avgIntervalDays <= 10) return "weekly";
+  if (avgIntervalDays <= 45) return "monthly";
+  if (avgIntervalDays <= 120) return "quarterly";
+  return "yearly";
+}
+
 export async function detectRecurringTransactions(userId: string) {
   const sixMonthsAgo = subMonths(new Date(), 6);
 
@@ -25,7 +42,9 @@ export async function detectRecurringTransactions(userId: string) {
 
   for (const tx of transactions) {
     if (!tx.merchantName) continue;
-    const key = tx.merchantName.toLowerCase().trim();
+    const canonicalMerchant = normalizeMerchantName(tx.merchantName);
+    if (!canonicalMerchant) continue;
+    const key = canonicalMerchant;
 
     if (!groups[key]) {
       groups[key] = {
@@ -52,11 +71,17 @@ export async function detectRecurringTransactions(userId: string) {
     if (group.count < 2) continue;
 
     const avgAmount = group.amounts.reduce((a, b) => a + b, 0) / group.amounts.length;
+    if (avgAmount < 1) continue;
+
     const amountVariance = group.amounts.every(
-      (a) => Math.abs(a - avgAmount) / avgAmount < 0.15
+      (a) => Math.abs(a - avgAmount) / avgAmount < 0.35
     );
 
-    if (!amountVariance) continue;
+    const maxAmount = Math.max(...group.amounts);
+    const minAmount = Math.min(...group.amounts);
+    const amountSpreadIsSmall = (maxAmount - minAmount) / avgAmount < 0.5;
+
+    if (!amountVariance && !amountSpreadIsSmall) continue;
 
     const intervals: number[] = [];
     for (let i = 1; i < group.dates.length; i++) {
@@ -68,16 +93,13 @@ export async function detectRecurringTransactions(userId: string) {
 
     const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
 
-    let frequency = "monthly";
-    if (avgInterval < 10) frequency = "weekly";
-    else if (avgInterval > 80) frequency = "quarterly";
-    else if (avgInterval > 340) frequency = "yearly";
+    const frequency = detectFrequency(avgInterval);
 
     const isRegular = intervals.every(
-      (i) => Math.abs(i - avgInterval) / avgInterval < 0.3
+      (i) => Math.abs(i - avgInterval) / avgInterval < 0.45
     );
 
-    if (!isRegular && group.count < 4) continue;
+    if (!isRegular && group.count < 3) continue;
 
     recurring.push({
       merchantName: group.merchantName,
@@ -87,13 +109,15 @@ export async function detectRecurringTransactions(userId: string) {
     });
   }
 
+  const existingGroups = await prisma.recurringGroup.findMany({
+    where: { userId },
+  });
+
   for (const item of recurring) {
-    const existing = await prisma.recurringGroup.findFirst({
-      where: {
-        userId,
-        merchantName: { equals: item.merchantName },
-      },
-    });
+    const normalizedItem = normalizeMerchantName(item.merchantName);
+    const existing = existingGroups.find(
+      (group) => normalizeMerchantName(group.merchantName) === normalizedItem
+    );
 
     if (existing) {
       await prisma.recurringGroup.update({
@@ -121,7 +145,15 @@ export async function detectRecurringTransactions(userId: string) {
           userId,
           type: "recurring_detected",
           title: "Nouvel abonnement détecté",
-          message: `${item.merchantName} - ${item.estimatedAmount.toFixed(2)}€/${item.frequency === "monthly" ? "mois" : item.frequency === "weekly" ? "semaine" : "trimestre"}`,
+          message: `${item.merchantName} - ${item.estimatedAmount.toFixed(2)}€/${
+            item.frequency === "monthly"
+              ? "mois"
+              : item.frequency === "weekly"
+                ? "semaine"
+                : item.frequency === "quarterly"
+                  ? "trimestre"
+                  : "an"
+          }`,
         },
       });
 

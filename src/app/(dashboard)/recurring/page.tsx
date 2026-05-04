@@ -1,11 +1,13 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Loader2, Repeat, RefreshCw } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 export default function RecurringPage() {
   const queryClient = useQueryClient();
+  const [autoDetectTriggered, setAutoDetectTriggered] = useState(false);
 
   const { data: groups, isLoading } = useQuery({
     queryKey: ["recurring"],
@@ -24,6 +26,14 @@ export default function RecurringPage() {
       queryClient.invalidateQueries({ queryKey: ["recurring"] });
     },
   });
+
+  useEffect(() => {
+    if (isLoading || autoDetectTriggered || detect.isPending) return;
+    if (groups && Array.isArray(groups) && groups.length === 0) {
+      setAutoDetectTriggered(true);
+      detect.mutate();
+    }
+  }, [isLoading, groups, autoDetectTriggered, detect]);
 
   const freqLabel: Record<string, string> = {
     weekly: "Hebdomadaire",

@@ -17,10 +17,6 @@ const MERCHANT_PATTERNS: Record<string, string[]> = {
   Livraison: [
     "uber eats", "uber *eats", "deliveroo", "just eat", "ubereats",
   ],
-  "Café & Snacks": [
-    "starbucks", "paul", "boulangerie", "patisserie", "cafe",
-    "ivs france", "cup service", "distributeur boisson",
-  ],
   Carburant: [
     "total", "shell", "bp", "esso", "elf", "station", "carburant",
     "essence", "gazole", "totalenergies",
@@ -35,16 +31,24 @@ const MERCHANT_PATTERNS: Record<string, string[]> = {
     "deezer", "canal+", "hbo", "youtube premium", "twitch",
     "google play apps",
   ],
+  Logiciels: [
+    "cursor", "claude.ai", "claude ai", "openai", "chatgpt",
+    "anthropic", "github copilot",
+  ],
   "Téléphone & Internet": [
     "orange", "sfr", "bouygues", "free mobile", "free telecom",
     "sosh", "red by sfr", "b&you",
   ],
-  Loyer: ["loyer", "bail", "bailleur", "loyer edf"],
+  Loyer: [
+    "loyer", "bail", "bailleur", "loyer edf",
+    "vir inst vers astrid", "vers astrid azzarone",
+  ],
   Salaire: ["salaire", "paie", "virement employeur", "remuneration"],
   "Autres revenus": ["virement en votre faveur"],
+  Remboursements: ["avoir carte", "remboursement"],
   "Assurance habitation": ["assurance habitation", "maif", "macif", "matmut", "axa", "groupama"],
   "Assurance auto": ["assurance auto", "assurance vehicule"],
-  Sport: ["salle de sport", "fitness", "gym", "basic fit", "neoness", "ask villeurbanne"],
+  Sport: ["salle de sport", "fitness", "gym", "basic fit", "neoness"],
   Pharmacie: ["pharmacie", "parapharmacie"],
   "Frais bancaires": [
     "frais bancaires", "commission intervention", "cotisation carte",
@@ -59,7 +63,12 @@ const MERCHANT_PATTERNS: Record<string, string[]> = {
     "apple store",
   ],
   "Jeux & Divertissement": [
-    "shotgun", "skinzp", "sumup",
+    "shotgun", "skinzp", "steam",
+  ],
+  "Café & Snacks": [
+    "starbucks", "paul", "boulangerie", "patisserie", "cafe",
+    "ivs france", "cup service", "distributeur boisson",
+    "ask villeurbanne",
   ],
 };
 
