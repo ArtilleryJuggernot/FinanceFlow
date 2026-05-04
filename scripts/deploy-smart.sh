@@ -6,22 +6,28 @@ set -euo pipefail
 #   ./scripts/deploy-smart.sh <from_commit> <to_commit>
 #   ./scripts/deploy-smart.sh --force-prisma
 #   ./scripts/deploy-smart.sh --force-prisma <from_commit> <to_commit>
+#   ./scripts/deploy-smart.sh --prisma-mode=auto|deploy|push
 #
 # Behavior:
 # - Runs `sudo npm i` only when dependency files changed.
-# - Runs Prisma commands when schema changed.
+# - Runs Prisma commands when schema changed (or forced).
 # - Always runs `npm run build`.
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 FORCE_PRISMA=false
+PRISMA_MODE="auto"
 POSITIONAL_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --force-prisma)
       FORCE_PRISMA=true
+      shift
+      ;;
+    --prisma-mode=*)
+      PRISMA_MODE="${1#*=}"
       shift
       ;;
     *)
@@ -44,6 +50,7 @@ fi
 echo "=== Smart Deploy Start ==="
 echo "Repo: $ROOT_DIR"
 echo "Range: ${RANGE:-<none>}"
+echo "Prisma mode: $PRISMA_MODE"
 
 CHANGED_FILES=""
 if [[ -n "$RANGE" ]]; then
@@ -85,9 +92,35 @@ else
 fi
 
 if [[ "$needs_prisma" == true ]]; then
-  echo "-> Prisma changes detected: running prisma generate + migrate deploy"
+  if [[ "$PRISMA_MODE" != "auto" && "$PRISMA_MODE" != "deploy" && "$PRISMA_MODE" != "push" ]]; then
+    echo "-> Invalid prisma mode: $PRISMA_MODE (expected auto|deploy|push)"
+    exit 1
+  fi
+
+  has_migrations=false
+  if [[ -d "prisma/migrations" ]] && [[ -n "$(ls -A prisma/migrations 2>/dev/null || true)" ]]; then
+    has_migrations=true
+  fi
+
+  resolved_prisma_mode="$PRISMA_MODE"
+  if [[ "$resolved_prisma_mode" == "auto" ]]; then
+    if [[ "$has_migrations" == true ]]; then
+      resolved_prisma_mode="deploy"
+    else
+      resolved_prisma_mode="push"
+    fi
+  fi
+
+  echo "-> Running prisma generate"
   npx prisma generate
-  npx prisma migrate deploy
+
+  if [[ "$resolved_prisma_mode" == "deploy" ]]; then
+    echo "-> Running prisma migrate deploy"
+    npx prisma migrate deploy
+  else
+    echo "-> Running prisma db push (no migrations baseline)"
+    npx prisma db push
+  fi
 else
   echo "-> Prisma unchanged: skipping prisma commands"
 fi
