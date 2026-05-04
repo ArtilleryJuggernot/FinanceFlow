@@ -30,6 +30,32 @@ export default function GuidePage() {
       </section>
 
       <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 space-y-3">
+        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+          Abonnements (page Dépenses récurrentes)
+        </h2>
+        <ul className="list-disc space-y-2 pl-5 text-sm text-gray-600 dark:text-gray-300">
+          <li>
+            <strong>Logo</strong> : affiché à gauche du nom du marchand (même ligne que le titre),
+            proportions conservées.
+          </li>
+          <li>
+            <strong>✅ Wishlist</strong> : bouton vert avec la coche ; enregistré dans ta règle
+            marchand. Les abonnements en wishlist sont <strong>toujours listés en premier</strong>{" "}
+            (épinglés en haut). Clique à nouveau pour retirer.
+          </li>
+          <li>
+            <strong>❌ Banlist</strong> : bouton rouge à côté ; le marchand sort des abonnements
+            détectés et apparaît dans la section « Marchands exclus ». Tu peux le réactiver depuis
+            cette liste.
+          </li>
+          <li>
+            <strong>📌</strong> : petit repère visuel à côté du nom quand l’abonnement est en
+            wishlist.
+          </li>
+        </ul>
+      </section>
+
+      <section className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 space-y-3">
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">FAQ</h2>
         <div className="space-y-3 text-sm text-gray-600 dark:text-gray-300">
           <p>
@@ -39,6 +65,11 @@ export default function GuidePage() {
           <p>
             <strong>Pourquoi un marchand n'apparaît pas en abonnement ?</strong> Il peut être dans la
             banlist, ou la récurrence n'est pas encore assez forte.
+          </p>
+          <p>
+            <strong>À quoi sert le bouton ✅ sur les abonnements ?</strong> C’est la wishlist : tu
+            épingles un abonnement en haut de la liste pour le retrouver tout de suite (préférence
+            sauvegardée).
           </p>
           <p>
             <strong>Comment aller plus vite dans l'app ?</strong> Utilise <strong>Ctrl + K</strong>{" "}

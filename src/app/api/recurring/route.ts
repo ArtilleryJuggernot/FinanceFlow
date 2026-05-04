@@ -29,6 +29,7 @@ export async function GET() {
         merchantRule: matchedRule
           ? {
               excludeFromRecurring: matchedRule.excludeFromRecurring,
+              wishlistRecurring: matchedRule.wishlistRecurring,
               categoryIds: matchedRule.categoryIds ?? [],
               displayName: matchedRule.displayName,
               avatarUrl: matchedRule.avatarUrl,
@@ -36,6 +37,13 @@ export async function GET() {
             }
           : null,
       };
+    });
+
+    enriched.sort((a, b) => {
+      const wa = a.merchantRule?.wishlistRecurring ? 1 : 0;
+      const wb = b.merchantRule?.wishlistRecurring ? 1 : 0;
+      if (wb !== wa) return wb - wa;
+      return b.estimatedAmount - a.estimatedAmount;
     });
 
     return NextResponse.json(enriched);

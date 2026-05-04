@@ -14,6 +14,7 @@ const updateRuleSchema = z
     displayName: z.string().optional(),
     notes: z.string().optional(),
     avatarUrl: z.string().optional(),
+    wishlistRecurring: z.boolean().optional(),
   })
   .refine((v) => !!v.merchantName || !!v.merchantPattern || !!v.merchantId, {
     message: "merchantName ou merchantPattern ou merchantId requis",
@@ -95,11 +96,15 @@ export async function PATCH(request: Request) {
         ...(payload.displayName !== undefined && { displayName: payload.displayName }),
         ...(payload.notes !== undefined && { notes: payload.notes }),
         ...(normalizedAvatarUrl !== undefined && { avatarUrl: normalizedAvatarUrl }),
+        ...(payload.wishlistRecurring !== undefined && {
+          wishlistRecurring: payload.wishlistRecurring,
+        }),
       },
       create: {
         userId: session.user.id,
         merchantPattern,
         excludeFromRecurring: payload.excludeFromRecurring ?? false,
+        wishlistRecurring: payload.wishlistRecurring ?? false,
         categoryIds: payload.categoryIds ?? [],
         displayName: payload.displayName,
         notes: payload.notes,

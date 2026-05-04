@@ -99,6 +99,7 @@ model MerchantRule {
   notes                 String?  @db.Text
   avatarUrl             String?
   excludeFromRecurring  Boolean  @default(false)
+  wishlistRecurring     Boolean  @default(false)
   categoryIds           Json?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
@@ -107,6 +108,7 @@ model MerchantRule {
 
   @@unique([userId, merchantPattern])
   @@index([userId, excludeFromRecurring])
+  @@index([userId, wishlistRecurring])
   @@map("merchant_rules")
 }
 

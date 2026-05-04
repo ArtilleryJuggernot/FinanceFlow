@@ -15,6 +15,7 @@ type RecurringGroup = {
   category: { id: string; name: string; color: string } | null;
   merchantRule: {
     excludeFromRecurring: boolean;
+    wishlistRecurring?: boolean;
     categoryIds: string[];
     displayName?: string | null;
     avatarUrl?: string | null;
@@ -43,8 +44,26 @@ type MerchantRule = {
   id: string;
   merchantPattern: string;
   excludeFromRecurring: boolean;
+  wishlistRecurring?: boolean;
   categoryIds: string[] | null;
 };
+
+function normalizeRecurringAvatarUrl(url?: string | null): string {
+  if (!url) return "";
+  const cleaned = url.trim().replace(/\\/g, "/");
+  if (cleaned.startsWith("http://") || cleaned.startsWith("https://")) return cleaned;
+  if (cleaned.startsWith("/api/uploads/merchant-avatar/file/")) return cleaned;
+  if (cleaned.startsWith("/uploads/merchants/")) {
+    const filename = cleaned.split("/").pop();
+    return filename ? `/api/uploads/merchant-avatar/file/${filename}` : cleaned;
+  }
+  if (cleaned.startsWith("uploads/merchants/")) {
+    const filename = cleaned.split("/").pop();
+    return filename ? `/api/uploads/merchant-avatar/file/${filename}` : `/${cleaned}`;
+  }
+  if (cleaned.startsWith("/")) return cleaned;
+  return `/${cleaned}`;
+}
 
 export default function RecurringPage() {
   const queryClient = useQueryClient();
@@ -105,6 +124,7 @@ export default function RecurringPage() {
       displayName?: string;
       notes?: string;
       avatarUrl?: string;
+      wishlistRecurring?: boolean;
     }) => {
       const res = await fetch("/api/recurring/rules", {
         method: "PATCH",
@@ -204,8 +224,8 @@ export default function RecurringPage() {
           {formatCurrency(totalMonthly)}
         </p>
         <p className="text-sm opacity-80 mt-1">
-          {activeGroups.length} abonnement{activeGroups.length > 1 ? "s" : ""} actif
-          {activeGroups.length > 1 ? "s" : ""}
+          {activeGroups.length} abonnement{activeGroups.length > 1 ? "s" : ""}{" "}
+          actif{activeGroups.length > 1 ? "s" : ""}
         </p>
       </div>
 
@@ -247,31 +267,54 @@ export default function RecurringPage() {
             <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
               {activeGroups.map((g) => (
                 <Fragment key={g.id}>
-                  <tr key={g.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                  <tr
+                    key={g.id}
+                    className={cn(
+                      "hover:bg-gray-50 dark:hover:bg-gray-750",
+                      g.merchantRule?.wishlistRecurring &&
+                        "bg-amber-50/70 dark:bg-amber-950/25"
+                    )}
+                  >
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() =>
-                          setOpenMerchant((prev) => (prev === g.merchantName ? null : g.merchantName))
-                        }
-                        className="flex items-center gap-2 font-medium text-gray-900 dark:text-white"
-                      >
-                        <ChevronDown
-                          className={cn(
-                            "w-4 h-4 transition-transform",
-                            openMerchant === g.merchantName && "rotate-180"
-                          )}
-                        />
-                        {g.merchantRule?.displayName || g.merchantName}
-                      </button>
-                      {g.merchantRule?.avatarUrl && (
-                        <div className="mt-2 h-8 w-14 overflow-hidden rounded-md bg-gray-50 p-0.5 dark:bg-gray-800">
-                          <img
-                            src={g.merchantRule.avatarUrl}
-                            alt={g.merchantRule.displayName || g.merchantName}
-                            className="h-full w-full object-contain"
-                          />
+                      <div className="flex items-center gap-3">
+                        {g.merchantRule?.avatarUrl ? (
+                          <div className="h-9 w-16 shrink-0 overflow-hidden rounded-md bg-gray-50 p-0.5 dark:bg-gray-800">
+                            <img
+                              src={normalizeRecurringAvatarUrl(g.merchantRule.avatarUrl)}
+                              alt=""
+                              className="h-full w-full object-contain"
+                            />
+                          </div>
+                        ) : (
+                          <div className="h-9 w-16 shrink-0 rounded-md bg-gray-100 dark:bg-gray-700" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setOpenMerchant((prev) =>
+                                prev === g.merchantName ? null : g.merchantName
+                              )
+                            }
+                            className="flex w-full items-center gap-2 text-left font-medium text-gray-900 dark:text-white"
+                          >
+                            <ChevronDown
+                              className={cn(
+                                "h-4 w-4 shrink-0 transition-transform",
+                                openMerchant === g.merchantName && "rotate-180"
+                              )}
+                            />
+                            <span className="truncate">
+                              {g.merchantRule?.wishlistRecurring && (
+                                <span className="mr-1 text-amber-600 dark:text-amber-400" title="Wishlist">
+                                  📌
+                                </span>
+                              )}
+                              {g.merchantRule?.displayName || g.merchantName}
+                            </span>
+                          </button>
                         </div>
-                      )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       {g.category ? (
@@ -352,18 +395,43 @@ export default function RecurringPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() =>
-                          updateMerchantRule.mutate({
-                            merchantName: g.merchantName,
-                            excludeFromRecurring: true,
-                          })
-                        }
-                        title="Exclure ce marchand des abonnements"
-                        className="inline-flex items-center justify-center rounded-md border border-red-200 p-1.5 text-red-600 hover:bg-red-50"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateMerchantRule.mutate({
+                              merchantName: g.merchantName,
+                              wishlistRecurring: !g.merchantRule?.wishlistRecurring,
+                            })
+                          }
+                          title={
+                            g.merchantRule?.wishlistRecurring
+                              ? "Retirer de la wishlist"
+                              : "Wishlist : épingler en haut de la liste"
+                          }
+                          className={cn(
+                            "inline-flex h-8 min-w-[2rem] items-center justify-center rounded-md border px-1 text-base leading-none transition-colors",
+                            g.merchantRule?.wishlistRecurring
+                              ? "border-emerald-400 bg-emerald-100 text-emerald-900 shadow-sm dark:border-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-100"
+                              : "border-gray-200 bg-white text-gray-600 hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-750"
+                          )}
+                        >
+                          ✅
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            updateMerchantRule.mutate({
+                              merchantName: g.merchantName,
+                              excludeFromRecurring: true,
+                            })
+                          }
+                          title="Exclure ce marchand des abonnements (banlist)"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/60 dark:hover:bg-red-950/40"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                   {openMerchant === g.merchantName && (
