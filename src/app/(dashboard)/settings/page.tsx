@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { useSession } from "next-auth/react";
 import { Loader2, Plus, Trash2, Save } from "lucide-react";
+import Link from "next/link";
 
 type CategoryRule = {
   id: string;
@@ -76,6 +77,12 @@ export default function SettingsPage() {
         <p className="text-gray-500 dark:text-gray-400">
           Configurez vos préférences et règles de catégorisation
         </p>
+        <Link
+          href="/settings/categories"
+          className="mt-2 inline-flex items-center text-sm text-indigo-600 hover:text-indigo-700"
+        >
+          Gérer toutes les catégories (CRUD)
+        </Link>
       </div>
 
       <div className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">

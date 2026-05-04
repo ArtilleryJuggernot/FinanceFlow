@@ -27,6 +27,14 @@ function detectFrequency(avgIntervalDays: number): string {
 
 export async function detectRecurringTransactions(userId: string) {
   const sixMonthsAgo = subMonths(new Date(), 6);
+  const merchantRules = await prisma.merchantRule.findMany({
+    where: { userId },
+  });
+  const excludedMerchants = new Set(
+    merchantRules
+      .filter((rule) => rule.excludeFromRecurring)
+      .map((rule) => rule.merchantPattern)
+  );
 
   const transactions = await prisma.transaction.findMany({
     where: {
@@ -43,7 +51,7 @@ export async function detectRecurringTransactions(userId: string) {
   for (const tx of transactions) {
     if (!tx.merchantName) continue;
     const canonicalMerchant = normalizeMerchantName(tx.merchantName);
-    if (!canonicalMerchant) continue;
+    if (!canonicalMerchant || excludedMerchants.has(canonicalMerchant)) continue;
     const key = canonicalMerchant;
 
     if (!groups[key]) {

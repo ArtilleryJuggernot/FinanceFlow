@@ -15,7 +15,26 @@ export async function GET() {
       orderBy: { estimatedAmount: "desc" },
     });
 
-    return NextResponse.json(groups);
+    const rules = await prisma.merchantRule.findMany({
+      where: { userId: session.user.id },
+    });
+
+    const enriched = groups.map((group) => {
+      const matchedRule = rules.find((rule) =>
+        group.merchantName.toLowerCase().includes(rule.merchantPattern.toLowerCase())
+      );
+      return {
+        ...group,
+        merchantRule: matchedRule
+          ? {
+              excludeFromRecurring: matchedRule.excludeFromRecurring,
+              categoryIds: matchedRule.categoryIds ?? [],
+            }
+          : null,
+      };
+    });
+
+    return NextResponse.json(enriched);
   } catch (error) {
     console.error("Recurring groups error:", error);
     return NextResponse.json({ error: "Erreur" }, { status: 500 });
