@@ -4,14 +4,19 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { normalizeMerchantName } from "@/lib/merchant";
 
-const updateRuleSchema = z.object({
-  merchantName: z.string().min(1),
-  excludeFromRecurring: z.boolean().optional(),
-  categoryIds: z.array(z.string()).optional(),
-  displayName: z.string().optional(),
-  notes: z.string().optional(),
-  avatarUrl: z.string().optional(),
-});
+const updateRuleSchema = z
+  .object({
+    merchantName: z.string().min(1).optional(),
+    merchantPattern: z.string().min(1).optional(),
+    excludeFromRecurring: z.boolean().optional(),
+    categoryIds: z.array(z.string()).optional(),
+    displayName: z.string().optional(),
+    notes: z.string().optional(),
+    avatarUrl: z.string().optional(),
+  })
+  .refine((v) => !!v.merchantName || !!v.merchantPattern, {
+    message: "merchantName ou merchantPattern requis",
+  });
 
 export async function GET() {
   try {
@@ -40,7 +45,8 @@ export async function PATCH(request: Request) {
     }
 
     const payload = updateRuleSchema.parse(await request.json());
-    const merchantPattern = normalizeMerchantName(payload.merchantName);
+    const merchantPattern =
+      payload.merchantPattern || normalizeMerchantName(payload.merchantName || "");
     const recurringGroups = await prisma.recurringGroup.findMany({
       where: { userId: session.user.id },
       select: { id: true, merchantName: true },

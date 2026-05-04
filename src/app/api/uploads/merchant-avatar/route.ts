@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, readdir, stat, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 
@@ -61,6 +61,47 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     console.error("Merchant avatar upload error:", error);
+    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+  }
+}
+
+export async function GET(request: Request) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Non autorisé" }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const search = (searchParams.get("search") || "").trim().toLowerCase();
+    const limit = Math.min(parseInt(searchParams.get("limit") || "30", 10), 100);
+
+    const uploadDir = path.join(process.cwd(), "public", "uploads", "merchants");
+    await mkdir(uploadDir, { recursive: true });
+
+    const files = await readdir(uploadDir);
+    const filtered = files
+      .filter((filename) => !search || filename.toLowerCase().includes(search))
+      .slice(0, limit);
+
+    const items = await Promise.all(
+      filtered.map(async (filename) => {
+        const filePath = path.join(uploadDir, filename);
+        const info = await stat(filePath);
+        const url = `/uploads/merchants/${filename}`;
+        return {
+          filename,
+          url,
+          absoluteUrl: `${new URL(request.url).origin}${url}`,
+          updatedAt: info.mtime.toISOString(),
+        };
+      })
+    );
+
+    items.sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1));
+    return NextResponse.json(items);
+  } catch (error) {
+    console.error("Merchant avatar list error:", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
   }
 }

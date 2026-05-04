@@ -44,6 +44,7 @@ export default function MerchantsPage() {
   const [sortKey, setSortKey] = useState<SortKey>("totalSpent");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [editingMerchant, setEditingMerchant] = useState<MerchantItem | null>(null);
+  const [avatarSearch, setAvatarSearch] = useState("");
   const [profileDraft, setProfileDraft] = useState({
     displayName: "",
     avatarUrl: "",
@@ -85,6 +86,7 @@ export default function MerchantsPage() {
   const updateMerchant = useMutation({
     mutationFn: async (payload: {
       merchantName: string;
+      merchantPattern?: string;
       displayName?: string;
       avatarUrl?: string;
       notes?: string;
@@ -104,7 +106,15 @@ export default function MerchantsPage() {
     },
   });
   const uploadMerchantAvatar = useMutation({
-    mutationFn: async ({ merchantName, file }: { merchantName: string; file: File }) => {
+    mutationFn: async ({
+      merchantName,
+      merchantPattern,
+      file,
+    }: {
+      merchantName: string;
+      merchantPattern: string;
+      file: File;
+    }) => {
       const formData = new FormData();
       formData.append("file", file);
 
@@ -120,6 +130,7 @@ export default function MerchantsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           merchantName,
+          merchantPattern,
           avatarUrl: uploadData.url,
         }),
       });
@@ -138,6 +149,18 @@ export default function MerchantsPage() {
     },
     onError: () => {
       setUploadingMerchant(null);
+    },
+  });
+  const { data: avatarLibrary } = useQuery({
+    queryKey: ["merchant-avatar-library", avatarSearch, editingMerchant?.merchantPattern],
+    enabled: !!editingMerchant,
+    queryFn: async () => {
+      const p = new URLSearchParams({
+        search: avatarSearch.trim(),
+        limit: "20",
+      });
+      const res = await fetch(`/api/uploads/merchant-avatar?${p.toString()}`);
+      return res.json();
     },
   });
 
@@ -178,6 +201,7 @@ export default function MerchantsPage() {
 
   function openProfileModal(merchant: MerchantItem) {
     setEditingMerchant(merchant);
+    setAvatarSearch("");
     setProfileDraft({
       displayName: merchant.displayName || "",
       avatarUrl: merchant.avatarUrl || "",
@@ -618,11 +642,17 @@ export default function MerchantsPage() {
                       uploadMerchantAvatar.mutate(
                         {
                           merchantName: editingMerchant.merchantName,
+                                  merchantPattern: editingMerchant.merchantPattern,
                           file,
                         },
                         {
                           onSuccess: (uploadData: { url: string }) => {
                             setProfileDraft((prev) => ({ ...prev, avatarUrl: uploadData.url }));
+                            updateMerchant.mutate({
+                              merchantName: editingMerchant.merchantName,
+                                      merchantPattern: editingMerchant.merchantPattern,
+                              avatarUrl: uploadData.url,
+                            });
                           },
                         }
                       );
@@ -639,6 +669,54 @@ export default function MerchantsPage() {
                 ) : (
                   <div className="h-12 w-12 rounded-full bg-gray-100 dark:bg-gray-800" />
                 )}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">
+                  Réutiliser une image existante
+                </label>
+                <input
+                  value={avatarSearch}
+                  onChange={(e) => setAvatarSearch(e.target.value)}
+                  placeholder="Filtrer par nom de fichier upload..."
+                  className="h-9 w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 text-sm"
+                />
+                <div className="mt-2 max-h-40 overflow-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                  {(avatarLibrary || []).length === 0 ? (
+                    <p className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
+                      Aucune image trouvée.
+                    </p>
+                  ) : (
+                    (avatarLibrary || []).map(
+                      (item: { filename: string; url: string; updatedAt: string }) => (
+                        <button
+                          key={item.filename}
+                          onClick={() =>
+                            setProfileDraft((prev) => ({
+                              ...prev,
+                              avatarUrl: item.url,
+                            }))
+                          }
+                          className="flex w-full items-center gap-2 border-b border-gray-100 dark:border-gray-800 px-3 py-2 text-left hover:bg-gray-50 dark:hover:bg-gray-800"
+                        >
+                          <img
+                            src={item.url}
+                            alt={item.filename}
+                            className="h-8 w-8 rounded object-cover"
+                          />
+                          <div className="min-w-0">
+                            <p className="truncate text-xs text-gray-700 dark:text-gray-200">
+                              {item.filename}
+                            </p>
+                            <p className="text-[10px] text-gray-500 dark:text-gray-400">
+                              {new Date(item.updatedAt).toLocaleString("fr-FR")}
+                            </p>
+                          </div>
+                        </button>
+                      )
+                    )
+                  )}
+                </div>
               </div>
 
               <div>
@@ -666,6 +744,7 @@ export default function MerchantsPage() {
                 onClick={() =>
                   updateMerchant.mutate({
                     merchantName: editingMerchant.merchantName,
+                    merchantPattern: editingMerchant.merchantPattern,
                     displayName: profileDraft.displayName,
                     avatarUrl: profileDraft.avatarUrl,
                     notes: profileDraft.notes,
